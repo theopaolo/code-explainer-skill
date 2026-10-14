@@ -1,0 +1,368 @@
+<title>{{SITE_NAME}}</title>
+<style>
+/*FONTS*/
+
+/* Layout: fixed chapter rail on the left, one chapter per view (hash router), figures framed by viewfinder corners.
+   ADAPT: replace token values with the project's own design tokens and font. */
+:root {
+  --bg: #0c0c0c;
+  --surface: #151515;
+  --raised: #1d1d1c;
+  --line: rgb(255 255 255 / 12%);
+  --line-strong: rgb(255 255 255 / 22%);
+  --fg: #f0f0f0;
+  --muted: rgb(240 240 240 / 66%);
+  --accent: #ffc800;
+  --accent-soft: #ffe06d;
+  --accent-dim: rgb(255 200 0 / 12%);
+  --on-accent: #161616;
+  --danger: #ff6a5a;
+  --plot-bg: #101010;
+  --font-body: "SNPro", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.75rem;
+  --step-3: clamp(2rem, 4vw + 1rem, 3.25rem);
+  --radius: 10px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f2ee; --surface: #ffffff; --raised: #eceae4; --line: rgb(0 0 0 / 11%); --line-strong: rgb(0 0 0 / 22%);
+    --fg: #161616; --muted: #5d5b54; --accent: #9a7300; --accent-soft: #7a5b00; --accent-dim: rgb(180 135 0 / 13%);
+    --on-accent: #ffffff; --danger: #c8321f; --plot-bg: #fbfaf7; color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f3f2ee; --surface: #ffffff; --raised: #eceae4; --line: rgb(0 0 0 / 11%); --line-strong: rgb(0 0 0 / 22%);
+  --fg: #161616; --muted: #5d5b54; --accent: #9a7300; --accent-soft: #7a5b00; --accent-dim: rgb(180 135 0 / 13%);
+  --on-accent: #ffffff; --danger: #c8321f; --plot-bg: #fbfaf7; color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--font-body); font-size: var(--step-0); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; overflow-y: auto; border-right: 1px solid var(--line); padding: 28px 18px; display: flex; flex-direction: column; gap: 22px; background: var(--bg); }
+.brand { display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: var(--fg); }
+.brand b { font-weight: 600; font-size: 1.15rem; letter-spacing: 0.01em; }
+.brand small { color: var(--muted); font-size: var(--step--1); line-height: 1.35; }
+.strip { display: flex; height: 6px; border-radius: 3px; overflow: hidden; }
+.strip i { flex: 1; }
+.toc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.toc a { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; padding: 7px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 0.94rem; }
+.toc a:hover { color: var(--fg); background: var(--raised); }
+.toc a[aria-current="page"] { color: var(--fg); background: var(--accent-dim); }
+.toc a .n { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--step--1); }
+.toc .sep { height: 1px; background: var(--line); margin: 8px 10px; }
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; font-size: var(--step--1); color: var(--muted); }
+.theme-btns { display: flex; gap: 4px; }
+.theme-btns button { flex: 1; }
+
+main { padding-inline: clamp(16px, 4vw, 56px); padding-block: 40px 80px; min-width: 0; }
+.page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+.page[hidden] { display: none !important; }
+.eyebrow { font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+h1 { font-size: var(--step-3); line-height: 1.08; margin: 0; font-weight: 600; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: var(--step-2); line-height: 1.2; margin: 0; font-weight: 600; text-wrap: balance; }
+h3 { font-size: var(--step-1); margin: 0; font-weight: 600; }
+.prose { max-width: 66ch; display: flex; flex-direction: column; gap: 14px; }
+.prose p, .prose ul, .prose ol { margin: 0; }
+.prose ul, .prose ol { padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+.lede { font-size: var(--step-1); color: var(--muted); line-height: 1.5; max-width: 60ch; margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+code { background: var(--raised); padding: 1px 6px; border-radius: 5px; }
+.formula { font-family: var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; overflow-x: auto; white-space: pre; font-size: 0.92rem; line-height: 1.7; }
+
+.note { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; max-width: 66ch; background: var(--surface); }
+.note b { color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; font-size: var(--step--1); padding-top: 3px; }
+.note p { margin: 0; }
+
+/* Viewfinder frame: the subject's own vernacular for figures. */
+.vf { position: relative; padding: 14px; border-radius: 4px; }
+.vf::before, .vf::after, .vf > .c1, .vf > .c2 { content: ""; position: absolute; width: 18px; height: 18px; border-color: var(--accent); border-style: solid; pointer-events: none; }
+.vf::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.vf::after { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.vf > .c1 { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.vf > .c2 { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+.figure { display: flex; flex-direction: column; gap: 12px; }
+.figcap { color: var(--muted); font-size: var(--step--1); max-width: 70ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+canvas { display: block; width: 100%; height: auto; border-radius: 6px; background: var(--plot-bg); touch-action: none; }
+
+.controls { display: flex; flex-direction: column; gap: 14px; }
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; font-size: 0.92rem; }
+.ctl label { color: var(--fg); }
+.ctl output { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ctl input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.ctl small { grid-column: 1 / -1; color: var(--muted); font-size: var(--step--1); line-height: 1.4; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+button, .btn { font: inherit; font-size: 0.88rem; color: var(--fg); background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--line-strong); }
+button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.thumbs button { padding: 0; width: 54px; height: 54px; overflow: hidden; border-radius: 8px; border: 2px solid transparent; }
+.thumbs button[aria-pressed="true"] { border-color: var(--accent); background: none; }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.palette { display: flex; height: 64px; border-radius: 8px; overflow: hidden; }
+.palette div { flex: 1; display: flex; align-items: flex-end; padding: 6px; font-family: var(--font-mono); font-size: 0.7rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stat { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.stat span { color: var(--muted); font-size: var(--step--1); }
+.stat b { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--step--1); color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 6px; border: 2px solid var(--accent); }
+.legend i.dash { border-style: dashed; border-radius: 50%; }
+.legend i.fill { background: var(--accent-dim); border-radius: 3px; }
+
+/* Home */
+.hero { display: flex; flex-direction: column; gap: 18px; }
+.video-wrap { border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; max-width: 100%; }
+.video-wrap video { width: 100%; height: 100%; display: block; }
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.flow a { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none; color: var(--fg); background: var(--surface); position: relative; min-width: 0; }
+.flow a:hover { border-color: var(--accent); }
+.flow .n { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.flow b { font-weight: 600; }
+.flow small { color: var(--muted); font-size: var(--step--1); line-height: 1.4; }
+.flow code { font-size: 0.72rem; background: none; padding: 0; color: var(--muted); overflow-wrap: anywhere; }
+.threads { display: grid; grid-template-columns: 3fr 1fr; gap: 10px; font-size: var(--step--1); color: var(--muted); }
+.threads div { border: 1px dashed var(--line-strong); border-radius: 8px; padding: 6px 10px; text-align: center; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.08em; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+dl.gloss { display: grid; grid-template-columns: minmax(130px, max-content) 1fr; gap: 10px 20px; margin: 0; max-width: 72ch; }
+dl.gloss dt { font-weight: 600; }
+dl.gloss dd { margin: 0; color: var(--muted); }
+
+.tech { font-family: var(--font-mono); font-size: 0.82em; color: var(--accent-soft); background: var(--accent-dim); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+.techtable td:nth-child(2) .tech { white-space: normal; }
+.techtable td:nth-child(3) { color: var(--muted); }
+.why { border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; max-width: 70ch; display: flex; flex-direction: column; gap: 8px; }
+.why h3 { color: var(--accent); }
+.why ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
+.swrow { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.swc { margin: 0; display: flex; flex-direction: column; gap: 6px; width: 120px; }
+.swc i { display: block; height: 64px; border-radius: 8px; }
+.swc figcaption { font-size: var(--step--1); color: var(--muted); line-height: 1.35; }
+.pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.pair { display: flex; flex-direction: column; gap: 6px; }
+.pair div { display: flex; height: 56px; border-radius: 8px; overflow: hidden; }
+.pair div i { flex: 1; }
+.pair span { font-size: var(--step--1); color: var(--muted); }
+.chapters { display: flex; flex-wrap: wrap; gap: 6px; }
+.chapters button { font-size: 0.82rem; padding: 5px 10px; }
+.chapters button b { font-family: var(--font-mono); font-weight: 500; color: var(--accent); margin-right: 6px; }
+.pager { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 20px; flex-wrap: wrap; }
+.pager a { text-decoration: none; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); min-width: 0; }
+.pager a:hover { border-color: var(--accent); }
+.pager a span { color: var(--muted); font-size: var(--step--1); }
+.pager .next { margin-left: auto; text-align: right; }
+
+.mobile-bar { display: none; }
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: none; }
+  .mobile-bar { display: flex; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; gap: 10px; align-items: center; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .mobile-bar b { font-weight: 600; }
+  .mobile-bar select { margin-left: auto; font: inherit; font-size: 0.9rem; background: var(--raised); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 62vw; }
+  main { padding-block: 24px 60px; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .threads { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+
+<div class="mobile-bar">
+  <b>{{PROJECT}}</b>
+  <select id="mobile-nav" aria-label="Chapitre"></select>
+</div>
+<div class="shell">
+  <nav class="rail" aria-label="Chapitres">
+    <a class="brand" href="#accueil">
+      <b>{{PROJECT}}</b>
+      <small>{{ONE_LINE_SUBJECT}}</small>
+      <!-- Optional signature strip: real colors/values from the subject. Delete if not meaningful. -->
+      <span class="strip" aria-hidden="true"><i style="background:var(--accent)"></i><i style="background:var(--accent-soft)"></i><i style="background:var(--muted)"></i></span>
+    </a>
+    <ol class="toc" id="toc"></ol>
+    <div class="rail-foot">
+      <div class="theme-btns" role="group" aria-label="Thème">
+        <button type="button" data-theme-choice="system">Auto</button>
+        <button type="button" data-theme-choice="dark">Sombre</button>
+        <button type="button" data-theme-choice="light">Clair</button>
+      </div>
+      <span>Texte en langage technique simplifié, d'après les règles ASD-STE100.</span>
+    </div>
+  </nav>
+
+  <main id="main">
+
+  <!-- ===== HOME: thesis, video, chapter buttons, step diagram ===== -->
+  <section class="page" data-page="accueil" data-title="Accueil">
+    <div class="hero">
+      <span class="eyebrow">Explication technique</span>
+      <h1>{{TITLE_QUESTION}}</h1>
+      <p class="lede">{{LEDE_3_SHORT_SENTENCES}}</p>
+    </div>
+    <div class="vf"><span class="c1"></span><span class="c2"></span>
+      <div class="video-wrap"><video id="explainer-video" controls preload="metadata" playsinline poster="poster.jpg"><source src="explainer.mp4" type="video/mp4"></video></div>
+    </div>
+    <p class="figcap">Vidéo explicative, DURATION. Les données de la vidéo viennent du code réel.</p>
+    <div class="chapters" id="chapters" role="group" aria-label="Chapitres de la vidéo"></div>
+    <h2>Le processus en N étapes</h2>
+    <div class="flow">
+      <!-- One card per real pipeline step; the code file in <code> -->
+      <a href="#etape-1"><span class="n">1</span><b>{{STEP}}</b><small>{{ONE_SENTENCE}}</small><code>{{file.js}}</code></a>
+    </div>
+  </section>
+
+  <!-- ===== CHAPTER PATTERN (copy per step) =====
+       eyebrow → h1 → prose (what) → formula (if any) → interactive figure (cols: canvas + panel)
+       → .why block(s) → table "Termes techniques" → note/attention callouts. Pager is added by JS. -->
+  <section class="page" data-page="etape-1" data-step="1" data-title="{{STEP}}" hidden>
+    <span class="eyebrow">Étape 1 sur N</span>
+    <h1>{{STEP}}</h1>
+    <div class="prose">
+      <p>{{WHAT: short STE sentences}} <span class="tech">{{technical term}}</span></p>
+      <ol><li>{{procedure step, one action}}</li></ol>
+    </div>
+    <div class="formula">{{formula in plain monospace}}</div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-step1" width="720" height="540" aria-label="{{what the figure shows}}"></canvas></div>
+      <div class="panel">
+        <div class="ctl"><label for="s1-param">{{Param}}</label><output id="s1-param-out"></output>
+          <input type="range" id="s1-param" min="0" max="1" step="0.01" value="0.5">
+          <small>{{what the control changes}}</small></div>
+        <div class="stats"><div class="stat"><span>{{Metric}}</span><b id="s1-metric">–</b></div></div>
+      </div>
+    </div>
+    <p class="figcap">{{caption: what to look at, what to try}}</p>
+    <div class="why"><h3>Pourquoi ?</h3><ul>
+      <li><strong>{{Decision}}.</strong> {{Reason in 1–3 short sentences. Name the alternative and why it loses.}}</li>
+    </ul></div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody>
+      <tr><td>{{plain}}</td><td><span class="tech">{{technical}}</span></td><td>{{formula / constant / origin}}</td></tr>
+    </tbody></table></div>
+    <div class="note"><b>Note</b><p>{{useful info}}</p></div>
+    <div class="note"><b>Attention</b><p>{{pitfall / invariant}}</p></div>
+  </section>
+
+  <!-- ===== GLOSSARY + writing method + source files ===== -->
+  <section class="page" data-page="glossaire" data-title="Glossaire" hidden>
+    <span class="eyebrow">Référence</span>
+    <h1>Glossaire et méthode d'écriture</h1>
+    <dl class="gloss"><dt>{{Terme}}</dt><dd>{{Définition. En anglais : <span class="tech">term</span>.}}</dd></dl>
+    <h2>Fichiers source</h2>
+    <div class="table-wrap"><table><thead><tr><th>Fichier</th><th>Rôle</th></tr></thead><tbody>
+      <tr><td><code>{{path}}</code></td><td>{{role}}</td></tr>
+    </tbody></table></div>
+  </section>
+
+  </main>
+</div>
+
+<!-- Real project code, bundled as an IIFE that assigns globalThis.Lab (see scripts/bundle_lab.sh). Remove if unused. -->
+<script src="lab.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const Lab = window.Lab;
+  const fr = (v, d = 2) => Number(v).toFixed(d).replace(".", ",");          // locale decimal comma
+  const int = (v) => Math.round(v).toLocaleString("fr-FR");
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const imgCache = new Map();
+  function loadImage(src) {
+    if (!imgCache.has(src)) imgCache.set(src, new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }));
+    return imgCache.get(src);
+  }
+
+  // ---------------- router: one page visible, pager + toc built from sections
+  const pages = $$(".page"), toc = $("#toc"), mnav = $("#mobile-nav");
+  const inits = {}, redraws = {}, started = new Set();
+  let redrawCurrent = null;
+  pages.forEach((p, i) => {
+    const id = p.dataset.page, title = p.dataset.title, n = p.dataset.step ?? "";
+    const li = document.createElement("li");
+    li.innerHTML = `<a href="#${id}"><span class="n">${n}</span><span>${title}</span></a>`;
+    toc.appendChild(li);
+    const o = document.createElement("option"); o.value = id; o.textContent = (n ? n + ". " : "") + title; mnav.appendChild(o);
+    const prev = pages[i - 1], next = pages[i + 1];
+    const pager = document.createElement("nav"); pager.className = "pager"; pager.setAttribute("aria-label", "Chapitre précédent et suivant");
+    if (prev) pager.insertAdjacentHTML("beforeend", `<a href="#${prev.dataset.page}"><span>← Précédent</span>${prev.dataset.title}</a>`);
+    if (next) pager.insertAdjacentHTML("beforeend", `<a class="next" href="#${next.dataset.page}"><span>Suivant →</span>${next.dataset.title}</a>`);
+    p.appendChild(pager);
+  });
+  mnav.addEventListener("change", () => { location.hash = mnav.value; });
+  function route() {
+    const id = (location.hash || "#accueil").slice(1);
+    const page = pages.find((p) => p.dataset.page === id) ?? pages[0];
+    pages.forEach((p) => (p.hidden = p !== page));
+    $$("a", toc).forEach((a) => { if (a.getAttribute("href") === "#" + page.dataset.page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    mnav.value = page.dataset.page;
+    if (page.dataset.page !== "accueil") { const v = $("#explainer-video"); if (v && !v.paused) v.pause(); }
+    if (!started.has(page.dataset.page) && inits[page.dataset.page]) { started.add(page.dataset.page); inits[page.dataset.page](); }
+    redrawCurrent = redraws[page.dataset.page] ?? null;
+    if (redrawCurrent) redrawCurrent();
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", route);
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, select, textarea, video") || e.metaKey || e.ctrlKey || e.altKey) return;
+    const i = pages.findIndex((p) => !p.hidden);
+    if (e.key === "ArrowRight" && pages[i + 1]) location.hash = pages[i + 1].dataset.page;
+    if (e.key === "ArrowLeft" && pages[i - 1]) location.hash = pages[i - 1].dataset.page;
+  });
+
+  // ---------------- theme: system / dark / light; canvases redraw on change
+  const themeBtns = $$("[data-theme-choice]");
+  function applyTheme(choice) {
+    if (choice === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", choice);
+    themeBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeChoice === choice)));
+    try { localStorage.setItem("explainer-theme", choice); } catch {}
+  }
+  themeBtns.forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.themeChoice)));
+  let saved = "system"; try { saved = localStorage.getItem("explainer-theme") || "system"; } catch {}
+  applyTheme(saved);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redrawCurrent && redrawCurrent());
+  new MutationObserver(() => redrawCurrent && redrawCurrent()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------------- chapter demos: inits[id] runs once on first visit, redraws[id] on theme change / revisit
+  inits["etape-1"] = () => {
+    const cv = $("#cv-step1"), x = cv.getContext("2d");
+    function draw() {
+      const v = +$("#s1-param").value; $("#s1-param-out").value = fr(v);
+      x.fillStyle = css("--plot-bg"); x.fillRect(0, 0, cv.width, cv.height);
+      // Draw with theme tokens: css("--fg"), css("--muted"), css("--accent"), css("--line").
+      // Call the REAL code via Lab.* so the demo matches the product.
+    }
+    $("#s1-param").addEventListener("input", draw);
+    redraws["etape-1"] = draw;
+  };
+
+  // ---------------- video chapters (CHAPTERS_JSON injected by build_site.py)
+  const CHAPTERS = CHAPTERS_JSON;
+  const vid = $("#explainer-video"), chap = $("#chapters");
+  CHAPTERS.forEach(([t, label]) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.innerHTML = `<b>${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}</b>${label}`;
+    b.addEventListener("click", () => { vid.currentTime = t; vid.play().catch(() => {}); });
+    chap.appendChild(b);
+  });
+
+  route();
+})();
+</script>

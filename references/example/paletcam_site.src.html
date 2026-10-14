@@ -1,0 +1,1273 @@
+<title>ColorCatchers, l'extraction des couleurs</title>
+<style>
+/*FONTS*/
+/* Layout: a camera-instrument manual. Fixed chapter rail on the left, one chapter per view, figures framed by viewfinder corners. */
+:root {
+  --bg: #0c0c0c;
+  --surface: #151515;
+  --raised: #1d1d1c;
+  --line: rgb(255 255 255 / 12%);
+  --line-strong: rgb(255 255 255 / 22%);
+  --fg: #f0f0f0;
+  --muted: rgb(240 240 240 / 66%);
+  --accent: #ffc800;
+  --accent-soft: #ffe06d;
+  --accent-dim: rgb(255 200 0 / 12%);
+  --on-accent: #161616;
+  --danger: #ff6a5a;
+  --plot-bg: #101010;
+  --font-body: "SNPro", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.75rem;
+  --step-3: clamp(2rem, 4vw + 1rem, 3.25rem);
+  --radius: 10px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f2ee; --surface: #ffffff; --raised: #eceae4; --line: rgb(0 0 0 / 11%); --line-strong: rgb(0 0 0 / 22%);
+    --fg: #161616; --muted: #5d5b54; --accent: #9a7300; --accent-soft: #7a5b00; --accent-dim: rgb(180 135 0 / 13%);
+    --on-accent: #ffffff; --danger: #c8321f; --plot-bg: #fbfaf7; color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f3f2ee; --surface: #ffffff; --raised: #eceae4; --line: rgb(0 0 0 / 11%); --line-strong: rgb(0 0 0 / 22%);
+  --fg: #161616; --muted: #5d5b54; --accent: #9a7300; --accent-soft: #7a5b00; --accent-dim: rgb(180 135 0 / 13%);
+  --on-accent: #ffffff; --danger: #c8321f; --plot-bg: #fbfaf7; color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--font-body); font-size: var(--step-0); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; overflow-y: auto; border-right: 1px solid var(--line); padding: 28px 18px; display: flex; flex-direction: column; gap: 22px; background: var(--bg); }
+.brand { display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: var(--fg); }
+.brand b { font-weight: 600; font-size: 1.15rem; letter-spacing: 0.01em; }
+.brand small { color: var(--muted); font-size: var(--step--1); line-height: 1.35; }
+.strip { display: flex; height: 6px; border-radius: 3px; overflow: hidden; }
+.strip i { flex: 1; }
+.toc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.toc a { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; padding: 7px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 0.94rem; }
+.toc a:hover { color: var(--fg); background: var(--raised); }
+.toc a[aria-current="page"] { color: var(--fg); background: var(--accent-dim); }
+.toc a .n { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--step--1); }
+.toc .sep { height: 1px; background: var(--line); margin: 8px 10px; }
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; font-size: var(--step--1); color: var(--muted); }
+.theme-btns { display: flex; gap: 4px; }
+.theme-btns button { flex: 1; }
+
+main { padding-inline: clamp(16px, 4vw, 56px); padding-block: 40px 80px; min-width: 0; }
+.page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+.page[hidden] { display: none !important; }
+.eyebrow { font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+h1 { font-size: var(--step-3); line-height: 1.08; margin: 0; font-weight: 600; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: var(--step-2); line-height: 1.2; margin: 0; font-weight: 600; text-wrap: balance; }
+h3 { font-size: var(--step-1); margin: 0; font-weight: 600; }
+.prose { max-width: 66ch; display: flex; flex-direction: column; gap: 14px; }
+.prose p, .prose ul, .prose ol { margin: 0; }
+.prose ul, .prose ol { padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+.lede { font-size: var(--step-1); color: var(--muted); line-height: 1.5; max-width: 60ch; margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+code { background: var(--raised); padding: 1px 6px; border-radius: 5px; }
+.formula { font-family: var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; overflow-x: auto; white-space: pre; font-size: 0.92rem; line-height: 1.7; }
+
+.note { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; max-width: 66ch; background: var(--surface); }
+.note b { color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; font-size: var(--step--1); padding-top: 3px; }
+.note p { margin: 0; }
+
+/* Viewfinder frame: the subject's own vernacular for figures. */
+.vf { position: relative; padding: 14px; border-radius: 4px; }
+.vf::before, .vf::after, .vf > .c1, .vf > .c2 { content: ""; position: absolute; width: 18px; height: 18px; border-color: var(--accent); border-style: solid; pointer-events: none; }
+.vf::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.vf::after { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.vf > .c1 { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.vf > .c2 { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+.figure { display: flex; flex-direction: column; gap: 12px; }
+.figcap { color: var(--muted); font-size: var(--step--1); max-width: 70ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+canvas { display: block; width: 100%; height: auto; border-radius: 6px; background: var(--plot-bg); touch-action: none; }
+
+.controls { display: flex; flex-direction: column; gap: 14px; }
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; font-size: 0.92rem; }
+.ctl label { color: var(--fg); }
+.ctl output { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ctl input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.ctl small { grid-column: 1 / -1; color: var(--muted); font-size: var(--step--1); line-height: 1.4; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+button, .btn { font: inherit; font-size: 0.88rem; color: var(--fg); background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--line-strong); }
+button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.thumbs button { padding: 0; width: 54px; height: 54px; overflow: hidden; border-radius: 8px; border: 2px solid transparent; }
+.thumbs button[aria-pressed="true"] { border-color: var(--accent); background: none; }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.palette { display: flex; height: 64px; border-radius: 8px; overflow: hidden; }
+.palette div { flex: 1; display: flex; align-items: flex-end; padding: 6px; font-family: var(--font-mono); font-size: 0.7rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stat { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.stat span { color: var(--muted); font-size: var(--step--1); }
+.stat b { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--step--1); color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 6px; border: 2px solid var(--accent); }
+.legend i.dash { border-style: dashed; border-radius: 50%; }
+.legend i.fill { background: var(--accent-dim); border-radius: 3px; }
+
+/* Home */
+.hero { display: flex; flex-direction: column; gap: 18px; }
+.video-wrap { border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; max-width: 100%; }
+.video-wrap video { width: 100%; height: 100%; display: block; }
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.flow a { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none; color: var(--fg); background: var(--surface); position: relative; min-width: 0; }
+.flow a:hover { border-color: var(--accent); }
+.flow .n { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.flow b { font-weight: 600; }
+.flow small { color: var(--muted); font-size: var(--step--1); line-height: 1.4; }
+.flow code { font-size: 0.72rem; background: none; padding: 0; color: var(--muted); overflow-wrap: anywhere; }
+.threads { display: grid; grid-template-columns: 3fr 1fr; gap: 10px; font-size: var(--step--1); color: var(--muted); }
+.threads div { border: 1px dashed var(--line-strong); border-radius: 8px; padding: 6px 10px; text-align: center; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.08em; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+dl.gloss { display: grid; grid-template-columns: minmax(130px, max-content) 1fr; gap: 10px 20px; margin: 0; max-width: 72ch; }
+dl.gloss dt { font-weight: 600; }
+dl.gloss dd { margin: 0; color: var(--muted); }
+
+.tech { font-family: var(--font-mono); font-size: 0.82em; color: var(--accent-soft); background: var(--accent-dim); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+.techtable td:nth-child(2) .tech { white-space: normal; }
+.techtable td:nth-child(3) { color: var(--muted); }
+.why { border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; max-width: 70ch; display: flex; flex-direction: column; gap: 8px; }
+.why h3 { color: var(--accent); }
+.why p { margin: 0; }
+.why ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
+.swrow { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.swc { margin: 0; display: flex; flex-direction: column; gap: 6px; width: 120px; }
+.swc i { display: block; height: 64px; border-radius: 8px; }
+.swc figcaption { font-size: var(--step--1); color: var(--muted); line-height: 1.35; }
+.pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.pair { display: flex; flex-direction: column; gap: 6px; }
+.pair div { display: flex; height: 56px; border-radius: 8px; overflow: hidden; }
+.pair div i { flex: 1; }
+.pair span { font-size: var(--step--1); color: var(--muted); }
+.chapters { display: flex; flex-wrap: wrap; gap: 6px; }
+.chapters button { font-size: 0.82rem; padding: 5px 10px; }
+.chapters button b { font-family: var(--font-mono); font-weight: 500; color: var(--accent); margin-right: 6px; }
+
+/* ---------- pipeline diagram ---------- */
+.pipe-wrap { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.pipe { position: relative; display: grid; grid-template-columns: 1fr 1fr 0.9fr; grid-auto-rows: minmax(54px, auto); gap: 14px 16px; padding: 14px; }
+.pipe svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.pipe .lane { border: 1px dashed var(--line-strong); border-radius: 12px; position: relative; z-index: 0; margin: -7px; }
+.pipe .lane span { position: absolute; top: -10px; left: 12px; background: var(--bg); padding: 0 6px; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+.pnode { position: relative; z-index: 1; align-self: center; display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--fg); cursor: pointer; min-width: 0; transition: border-color .15s, background .15s, box-shadow .15s; }
+.pnode b { font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
+.pnode small { color: var(--muted); font-size: 0.74rem; line-height: 1.25; }
+.pnode .k { position: absolute; top: -8px; right: 8px; font-family: var(--font-mono); font-size: 0.66rem; color: var(--accent); background: var(--bg); padding: 0 4px; border-radius: 4px; }
+.pnode.theory { border-style: dashed; }
+.pnode:hover { border-color: var(--accent); }
+.pipe .pnode[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--fg); }
+.pnode.is-now { box-shadow: 0 0 0 3px var(--accent); }
+.pnode.is-dim { opacity: 0.45; }
+.edges path { fill: none; stroke: var(--line-strong); stroke-width: 1.6; }
+.edges path.fb { stroke: var(--accent); stroke-dasharray: 5 5; }
+.edges path.on { stroke: var(--accent); stroke-width: 2.4; }
+.edges text { fill: var(--muted); font-size: 11px; font-family: var(--font-body); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+.pdetail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 12px; }
+.pdetail h3 { font-size: var(--step-1); }
+.pdetail h4 { margin: 0; font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
+.pdetail ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; font-size: 0.93rem; }
+.pdetail .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pdetail .num { font-family: var(--font-mono); font-size: 0.78rem; border: 1px solid var(--line-strong); border-radius: 6px; padding: 2px 7px; }
+.pdetail .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.pdetail a.btn { text-decoration: none; }
+.pipe-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pipe-tools label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; color: var(--muted); }
+@media (max-width: 860px) {
+  .pipe-wrap { grid-template-columns: minmax(0, 1fr); }
+  .pdetail { position: static; }
+  .pipe { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 860px) {
+  .pipe [data-node="loyalty"] { grid-row: 11 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="align"] { grid-row: 12 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="sma"] { grid-row: 13 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="dead"] { grid-row: 14 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="ema"] { grid-row: 15 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="out"] { grid-row: 18 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="cross"] { grid-row: 16 !important; grid-column: 1 !important; }
+  .pipe [data-node="avg9"] { grid-row: 16 !important; grid-column: 2 !important; }
+  .pipe [data-node="ral"] { grid-row: 17 !important; grid-column: 1 / 3 !important; }
+  .pipe .lane-w { grid-row: 4 / 12 !important; }
+  .pipe .lane-m { grid-row: 12 / 16 !important; }
+  .pipe .lane-x { grid-row: 16 / 18 !important; grid-column: 1 / 3 !important; }
+}
+.pager { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 20px; flex-wrap: wrap; }
+.pager a { text-decoration: none; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); min-width: 0; }
+.pager a:hover { border-color: var(--accent); }
+.pager a span { color: var(--muted); font-size: var(--step--1); }
+.pager .next { margin-left: auto; text-align: right; }
+
+.mobile-bar { display: none; }
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: none; }
+  .mobile-bar { display: flex; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; gap: 10px; align-items: center; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .mobile-bar b { font-weight: 600; }
+  .mobile-bar select { margin-left: auto; font: inherit; font-size: 0.9rem; background: var(--raised); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 62vw; }
+  main { padding-block: 24px 60px; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .threads { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+
+<div class="mobile-bar">
+  <b>ColorCatchers</b>
+  <select id="mobile-nav" aria-label="Chapitre"></select>
+</div>
+<div class="shell">
+  <nav class="rail" aria-label="Chapitres">
+    <a class="brand" href="#accueil">
+      <b>ColorCatchers</b>
+      <small>Comment l'application extrait les couleurs d'une image</small>
+      <span class="strip" aria-hidden="true"><i style="background:#312178"></i><i style="background:#cf3321"></i><i style="background:#e5a14c"></i><i style="background:#f0df00"></i><i style="background:#f8f8f8"></i></span>
+    </a>
+    <ol class="toc" id="toc"></ol>
+    <div class="rail-foot">
+      <div class="theme-btns" role="group" aria-label="Thème">
+        <button type="button" id="theme-system" data-theme-choice="system">Auto</button>
+        <button type="button" id="theme-dark" data-theme-choice="dark">Sombre</button>
+        <button type="button" id="theme-light" data-theme-choice="light">Clair</button>
+      </div>
+      <span>Texte en français technique simplifié, d'après les règles ASD-STE100.</span>
+    </div>
+  </nav>
+
+  <main id="main">
+
+  <!-- ============================================================ ACCUEIL -->
+  <section class="page" data-page="accueil" data-title="Accueil">
+    <div class="hero">
+      <span class="eyebrow">Explication technique</span>
+      <h1>Comment ColorCatchers trouve les couleurs d'une image</h1>
+      <p class="lede">ColorCatchers extrait une palette de l'image de la caméra, environ cinq fois par seconde, en quatre étapes : échantillonner, découper, choisir, lisser. Ce site explique chaque étape, la raison de chaque choix, et le nom technique de chaque méthode.</p>
+    </div>
+    <div class="vf"><span class="c1"></span><span class="c2"></span>
+      <div class="video-wrap"><video id="explainer-video" controls preload="metadata" playsinline poster="poster.jpg"><source src="explainer.mp4" type="video/mp4"></video></div>
+    </div>
+    <p class="figcap">Vidéo explicative, DURATION, en neuf chapitres. Un titre annonce le début de chaque chapitre. Narration en français. Les données de la vidéo viennent du code réel de l'application.</p>
+    <div class="chapters" id="chapters" role="group" aria-label="Chapitres de la vidéo"></div>
+
+    <h2>Vue d'ensemble du processus</h2>
+    <p class="figcap">Touchez une étape pour lire ce qu'elle fait, pourquoi, et son nom technique. Le bouton ▶ ouvre la vidéo au bon moment. Pendant la lecture, le schéma suit la vidéo.</p>
+    <div class="pipe-tools">
+      <button type="button" id="pipe-prev">← Étape précédente</button>
+      <button type="button" id="pipe-next">Étape suivante →</button>
+      <label><input type="checkbox" id="pipe-follow" checked> Suivre la vidéo</label>
+    </div>
+    <div class="pipe-wrap">
+      <div class="vf"><span class="c1"></span><span class="c2"></span>
+        <div class="pipe" id="pipe">
+          <svg class="edges" id="pipe-edges" aria-hidden="true"></svg>
+          <div class="lane lane-w" style="grid-row:4 / 11;grid-column:1 / 3"><span>Worker · ≈ 5 fois par seconde</span></div>
+          <div class="lane lane-m" style="grid-row:11 / 16;grid-column:1 / 3"><span>Fil principal · à chaque image</span></div>
+          <div class="lane lane-x" style="grid-row:4 / 7;grid-column:3"><span>Mode une couleur</span></div>
+          <button type="button" class="pnode theory" data-node="moyenne" style="grid-row:1;grid-column:1" aria-pressed="false"><b>Le problème de la moyenne</b><small>théorie</small></button><button type="button" class="pnode theory" data-node="oklab" style="grid-row:1;grid-column:2" aria-pressed="false"><b>L'espace OKLab</b><small>théorie</small></button><button type="button" class="pnode" data-node="cam" style="grid-row:2;grid-column:1 / 3" aria-pressed="false"><b>Image de la caméra</b><small>≈ 2 millions de pixels</small></button><button type="button" class="pnode" data-node="mode" style="grid-row:3;grid-column:1 / 3" aria-pressed="false"><b>Nombre de couleurs = 1 ?</b><small>choix du mode</small></button><button type="button" class="pnode" data-node="sample" style="grid-row:4;grid-column:1 / 3" aria-pressed="false"><span class="k">1</span><b>Échantillonner</b><small>1 pixel sur 7</small></button><button type="button" class="pnode" data-node="quant" style="grid-row:5;grid-column:1 / 3" aria-pressed="false"><span class="k">2a</span><b>Quantifier</b><small>32 niveaux par canal</small></button><button type="button" class="pnode" data-node="cut" style="grid-row:6;grid-column:1 / 3" aria-pressed="false"><span class="k">2b</span><b>Coupe médiane</b><small>55 boîtes</small></button><button type="button" class="pnode" data-node="thr" style="grid-row:7;grid-column:1 / 3" aria-pressed="false"><span class="k">3a</span><b>Seuil neutre</b><small>adaptatif</small></button><button type="button" class="pnode" data-node="neutral" style="grid-row:8;grid-column:1" aria-pressed="false"><span class="k">3b</span><b>Passe neutre</b><small>places réservées</small></button><button type="button" class="pnode" data-node="greedy" style="grid-row:8;grid-column:2" aria-pressed="false"><span class="k">3c</span><b>Sélection gloutonne</b><small>couleurs vives et distinctes</small></button><button type="button" class="pnode" data-node="tone" style="grid-row:9;grid-column:2" aria-pressed="false"><span class="k">3d</span><b>Tone</b><small>moyenne ↔ plus vif</small></button><button type="button" class="pnode" data-node="sort" style="grid-row:10;grid-column:1 / 3" aria-pressed="false"><span class="k">3e</span><b>Tri et complétion</b><small>palette brute</small></button><button type="button" class="pnode" data-node="loyalty" style="grid-row:9;grid-column:3" aria-pressed="false"><span class="k">P1</span><b>Fidélité</b><small>boucle de retour</small></button><button type="button" class="pnode" data-node="align" style="grid-row:11;grid-column:1 / 3" aria-pressed="false"><span class="k">P2</span><b>Alignement</b><small>même case, même couleur</small></button><button type="button" class="pnode" data-node="sma" style="grid-row:12;grid-column:1 / 3" aria-pressed="false"><span class="k">P3</span><b>Moyenne glissante</b><small>5 extractions</small></button><button type="button" class="pnode" data-node="dead" style="grid-row:13;grid-column:1 / 3" aria-pressed="false"><span class="k">P4</span><b>Zone morte</b><small>ΔE < 0,04</small></button><button type="button" class="pnode" data-node="ema" style="grid-row:14;grid-column:1 / 3" aria-pressed="false"><span class="k">P5</span><b>Lissage exponentiel</b><small>α = 0,16</small></button><button type="button" class="pnode" data-node="out" style="grid-row:15;grid-column:1 / 3" aria-pressed="false"><b>Palette affichée</b><small>vive, variée, stable</small></button><button type="button" class="pnode" data-node="cross" style="grid-row:4;grid-column:3" aria-pressed="false"><b>Croix 9 × 9</b><small>81 pixels</small></button><button type="button" class="pnode" data-node="avg9" style="grid-row:5;grid-column:3" aria-pressed="false"><b>Moyenne + lissage</b><small>bruit ÷ 9</small></button><button type="button" class="pnode" data-node="ral" style="grid-row:6;grid-column:3" aria-pressed="false"><b>Nom + RAL</b><small>ΔE2000 · pastille à l'écran</small></button>
+        </div>
+      </div>
+      <aside class="panel pdetail" id="pipe-detail" aria-live="polite"></aside>
+    </div>
+    <div class="prose">
+      <p>Les étapes 1 à 3 tournent dans un Web Worker, pour que l'interface ne ralentisse pas. L'étape 4 tourne sur le fil principal, avant l'affichage.</p>
+      <p>Deux chapitres expliquent la théorie : <a href="#probleme">le problème de la moyenne</a> et <a href="#oklab">l'espace OKLab</a>. Lisez ces chapitres d'abord si les couleurs numériques sont nouvelles pour vous.</p>
+    </div>
+    <div class="note"><b>Note</b><p>Les démonstrations de ce site utilisent le code source de ColorCatchers. Elles donnent le même résultat que l'application.</p></div>
+  </section>
+
+  <!-- ============================================================ PROBLEME -->
+  <section class="page" data-page="probleme" data-title="Le problème de la moyenne" hidden>
+    <span class="eyebrow">Théorie</span>
+    <h1>Le problème de la moyenne</h1>
+    <div class="prose">
+      <p>La moyenne d'une zone de couleur est plus terne que la couleur que vous voyez. La plupart des outils de palette affichent cette moyenne.</p>
+      <p>Une zone de couleur réelle n'est pas uniforme. Un objet rouge a des reflets, des ombres et des bords. Chaque pixel de l'objet a une couleur différente.</p>
+      <p>Dans le graphique, chaque point est un pixel. Le centre du graphique est le gris. La distance au centre est la <em>chroma</em>, c'est-à-dire l'intensité de la couleur.</p>
+    </div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-cloud" width="640" height="560" aria-label="Nuage de pixels rouges dans le plan a, b"></canvas></div>
+      <div class="panel">
+        <div class="ctl"><label for="cloud-tone">Mélange (Tone)</label><output id="cloud-tone-out">0,90</output>
+          <input type="range" id="cloud-tone" min="0" max="1" step="0.01" value="0.9">
+          <small>0 donne la moyenne. 1 donne le pixel le plus vif.</small></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><div id="cloud-mean" style="height:72px;border-radius:8px"></div><small class="figcap">Moyenne · C = <span id="cloud-mean-c" class="mono"></span></small></div>
+          <div><div id="cloud-mix" style="height:72px;border-radius:8px"></div><small class="figcap">Couleur affichée · C = <span id="cloud-mix-c" class="mono"></span></small></div>
+        </div>
+        <button type="button" id="cloud-reroll">Nouveau nuage de pixels</button>
+      </div>
+    </div>
+    <div class="why"><h3>Pourquoi la moyenne est terne</h3><p>La moyenne d'un nuage de points est toujours à l'intérieur du nuage. En géométrie, elle est dans l'<em>enveloppe convexe</em> <span class="tech">convex hull</span>. Les points les plus vifs sont sur le bord du nuage, loin du centre gris. Donc, la moyenne a toujours une chroma plus faible que les points vifs. Dans l'exemple de la vidéo, la chroma passe de 0,26 à 0,13.</p><p>L'ancienne version de l'application faisait trois moyennes successives : la boîte, le temps, puis l'affichage. Chaque moyenne rendait la couleur plus terne.</p></div>
+    <div class="prose">
+      <h3>La solution de ColorCatchers</h3>
+      <p>ColorCatchers garde deux couleurs pour chaque groupe de pixels : la moyenne, et le pixel le plus vif. L'application mélange ces deux couleurs. Le réglage Tone contrôle ce mélange. La valeur par défaut est 0,9.</p>
+      <p>Le pixel le plus vif existe réellement dans l'image. Donc, l'application n'invente pas de couleur.</p>
+    </div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Mélange</td><td><span class="tech">interpolation linéaire (lerp)</span></td><td>mix = moyenne + (vif − moyenne) × Tone, calculé dans OKLab</td></tr><tr><td>Couleur la plus vive</td><td><span class="tech">highest-chroma exemplar</span></td><td>Case de l'histogramme avec la plus grande chroma</td></tr><tr><td>Couleur terne</td><td><span class="tech">chroma shrinkage</span></td><td>La moyenne d'un nuage est plus proche de l'axe neutre que ses points</td></tr></tbody></table></div>
+
+  </section>
+
+  <!-- ============================================================ OKLAB -->
+  <section class="page" data-page="oklab" data-title="L'espace OKLab" hidden>
+    <span class="eyebrow">Théorie</span>
+    <h1>L'espace OKLab</h1>
+    <div class="prose">
+      <p>ColorCatchers fait ses calculs de couleur dans l'espace <em>OKLab</em> (Björn Ottosson, 2020). Dans OKLab, une distance égale donne une différence visible égale.</p>
+      <p>La caméra donne des pixels en sRGB : trois valeurs de 0 à 255. En sRGB, une même distance ne donne pas toujours la même différence visible, et une moyenne donne des mélanges trop sombres.</p>
+    </div>
+    <div class="why"><h3>Défaut 1 du sRGB : le gamma</h3><p>Les valeurs sRGB suivent une courbe gamma. Cette courbe donne plus de niveaux aux tons sombres. La valeur 128 donne environ 22 % de la lumière, et non 50 %. Une moyenne directe des valeurs sRGB donne donc des mélanges trop sombres, par exemple pour le rouge et le vert ci-dessous.</p></div>
+    <div class="swrow"><figure class="swc"><i style="background:rgb(255,0,0)"></i><figcaption>Rouge (255, 0, 0)</figcaption></figure><figure class="swc"><i style="background:rgb(0,255,0)"></i><figcaption>Vert (0, 255, 0)</figcaption></figure><figure class="swc"><i style="background:rgb(128,128,0)"></i><figcaption>Moyenne sRGB : (128, 128, 0), trop sombre</figcaption></figure><figure class="swc"><i style="background:rgb(188,188,0)"></i><figcaption>Moyenne en lumière réelle : (188, 188, 0)</figcaption></figure></div>
+    <div class="why"><h3>Défaut 2 du sRGB : les distances</h3><p>Les deux paires ci-dessous ont le même écart RGB : 40. L'écart visible est grand pour les bleus sombres, et presque nul pour les verts clairs.</p></div>
+    <div class="pairs">
+      <div class="pair"><div><i style="background:rgb(0,0,50)"></i><i style="background:rgb(0,40,50)"></i></div><span>Bleus sombres · Δ RGB = 40 · ΔE OK = 0,135 · très visible</span></div>
+      <div class="pair"><div><i style="background:rgb(0,230,0)"></i><i style="background:rgb(40,230,0)"></i></div><span>Verts clairs · Δ RGB = 40 · ΔE OK = 0,006 · presque invisible</span></div>
+    </div>
+    <div class="why"><h3>Pourquoi OKLab</h3><p>Dans OKLab, un seuil comme « deux couleurs sont différentes au-delà de 0,08 » fonctionne pour toutes les couleurs. La conversion est rapide : retirer le gamma, deux multiplications de matrices et une racine cubique.</p><p>OKLab corrige un défaut de l'ancien espace CIELAB, où un bleu devient violet quand sa chroma diminue. OKLab est aussi le standard des navigateurs web (CSS Color 4, fonctions <code>oklab()</code> et <code>oklch()</code>).</p></div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-oklab" width="640" height="640" aria-label="Coupe du plan a, b de l'espace OKLab"></canvas></div>
+      <div class="panel">
+        <div class="ctl"><label for="ok-l">Clarté L</label><output id="ok-l-out">0,70</output>
+          <input type="range" id="ok-l" min="0.15" max="0.97" step="0.01" value="0.7">
+          <small>Déplacez le curseur pour couper l'espace à une autre clarté.</small></div>
+        <div id="ok-swatch" style="height:80px;border-radius:8px;border:1px solid var(--line)"></div>
+        <div class="stats">
+          <div class="stat"><span>L</span><b id="ok-rl">–</b></div>
+          <div class="stat"><span>a</span><b id="ok-ra">–</b></div>
+          <div class="stat"><span>b</span><b id="ok-rb">–</b></div>
+          <div class="stat"><span>Chroma C</span><b id="ok-rc">–</b></div>
+          <div class="stat"><span>Teinte h</span><b id="ok-rh">–</b></div>
+          <div class="stat"><span>sRGB</span><b id="ok-rgb">–</b></div>
+        </div>
+        <small class="figcap">Touchez ou survolez le graphique pour lire une couleur. Les zones vides sont hors de l'écran sRGB.</small>
+      </div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Axe</th><th>Signification</th><th>Valeurs</th></tr></thead>
+      <tbody>
+        <tr><td>L</td><td>Clarté, du noir au blanc</td><td class="num">0 → 1</td></tr>
+        <tr><td>a</td><td>Axe vert (négatif) → rouge (positif)</td><td class="num">≈ −0,4 → 0,4</td></tr>
+        <tr><td>b</td><td>Axe bleu (négatif) → jaune (positif)</td><td class="num">≈ −0,4 → 0,4</td></tr>
+        <tr><td>C</td><td>Chroma : distance à l'axe des gris, √(a² + b²)</td><td class="num">0 → ≈ 0,32</td></tr>
+        <tr><td>h</td><td>Teinte : angle autour de l'axe des gris</td><td class="num">0° → 360°</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Espace OKLab</td><td><span class="tech">espace perceptuellement uniforme</span></td><td>Ottosson 2020 : sRGB → linéaire → LMS (cônes) → racine cubique → Lab</td></tr><tr><td>Retirer le gamma</td><td><span class="tech">linéarisation sRGB</span></td><td>Fonction de transfert inverse (srgbToLinear)</td></tr><tr><td>Distance entre couleurs</td><td><span class="tech">ΔE OK (distance euclidienne)</span></td><td>√(ΔL² + Δa² + Δb²) ; seuil visible ≈ 0,02</td></tr><tr><td>Chroma et teinte</td><td><span class="tech">coordonnées polaires (OKLCH)</span></td><td>C = √(a² + b²), h = atan2(b, a)</td></tr><tr><td>Écart de teinte</td><td><span class="tech">distance angulaire</span></td><td>min(|Δh|, 360° − |Δh|)</td></tr></tbody></table></div>
+    <div class="note"><b>Attention</b><p>La teinte est un angle. 359° et 1° sont deux rouges proches, mais leur moyenne numérique est 180°, un cyan. L'application ne fait donc jamais de moyenne sur la teinte. Elle calcule les distances et les moyennes sur L, a et b.</p></div>
+  </section>
+
+  <!-- ============================================================ ECHANTILLONNER -->
+  <section class="page" data-page="echantillonner" data-title="Échantillonner" hidden>
+    <span class="eyebrow">Étape 1 sur 4</span>
+    <h1>Échantillonner</h1>
+    <div class="prose">
+      <p>L'application lit un pixel sur <em>n</em>, en ligne et en colonne, et garde au maximum 46 000 pixels. La valeur <em>n</em> est le pas <span class="tech">stride</span>.</p>
+      <p>Une image de caméra contient des millions de pixels. L'application calcule une palette environ cinq fois par seconde et ne peut pas lire tous les pixels à cette vitesse. Le pas est le même dans les deux directions, donc les proportions des couleurs ne changent pas.</p>
+    </div>
+    <div class="formula">pas = ⌈ √( largeur × hauteur ÷ pixels maximum ) ⌉
+pixels maximum = 46 000</div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-sample" width="640" height="640" aria-label="Agrandissement des pixels lus"></canvas></div>
+      <div class="panel">
+        <div class="ctl"><label for="smp-size">Taille de l'image</label><output id="smp-size-out"></output>
+          <input type="range" id="smp-size" min="0" max="4" step="1" value="2">
+          <small>640 × 480, 1280 × 720, 1920 × 1080, 2560 × 1440 ou 4032 × 3024.</small></div>
+        <div class="ctl"><label for="smp-max">Pixels maximum</label><output id="smp-max-out"></output>
+          <input type="range" id="smp-max" min="5000" max="100000" step="1000" value="46000">
+          <small>La valeur de l'application est 46 000.</small></div>
+        <div class="stats">
+          <div class="stat"><span>Pixels de l'image</span><b id="smp-total"></b></div>
+          <div class="stat"><span>Pas</span><b id="smp-stride"></b></div>
+          <div class="stat"><span>Pixels lus</span><b id="smp-read"></b></div>
+          <div class="stat"><span>Part lue</span><b id="smp-share"></b></div>
+        </div>
+      </div>
+    </div>
+    <p class="figcap">L'agrandissement montre une zone de l'image. Les pixels encadrés sont les pixels lus. Les autres pixels sont ignorés.</p>
+    <div class="why"><h3>Pourquoi un pas régulier</h3><p>Une grille régulière couvre toute l'image de façon égale, donc chaque zone a le même poids dans l'échantillon. La grille est la même à chaque image. Un échantillon aléatoire changerait à chaque image et ferait clignoter la palette. Le pas est le même en x et en y, donc la forme de l'image ne change pas la répartition.</p><p>Limite : une couleur sur moins de 0,1 % de l'image peut disparaître. C'est un choix, car ces détails sont souvent du bruit : texte minuscule, voyants, reflets.</p></div>
+    <div class="prose">
+      <p>L'application ignore aussi les pixels totalement transparents. Chaque pixel lu devient un nombre entier de 32 bits : <code>0xFFRRGGBB</code>.</p>
+    </div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Échantillonner</td><td><span class="tech">sous-échantillonnage à pas fixe (strided subsampling)</span></td><td>Décimation uniforme en x et en y</td></tr><tr><td>Pas</td><td><span class="tech">stride</span></td><td>⌈√(pixels ÷ budget)⌉</td></tr><tr><td>Pixels maximum</td><td><span class="tech">budget d'échantillons</span></td><td>maxQuantizerPixels = 46 000</td></tr><tr><td>Nombre de 32 bits</td><td><span class="tech">empaquetage ARGB8888</span></td><td>Int32Array, pixels transparents ignorés</td></tr></tbody></table></div>
+
+  </section>
+
+  <!-- ============================================================ DECOUPER -->
+  <section class="page" data-page="decouper" data-title="Découper" hidden>
+    <span class="eyebrow">Étape 2 sur 4</span>
+    <h1>Découper</h1>
+    <p class="lede">Cette étape réduit environ 40 000 pixels à 55 boîtes de couleurs proches. D'abord, l'application quantifie les couleurs. Ensuite, elle groupe les couleurs avec la coupe médiane.</p>
+    <h2>Quantifier</h2>
+    <div class="prose">
+      <p>Quantifier <span class="tech">quantize</span>, c'est remplacer une valeur précise par la valeur la plus proche dans une petite liste. Exemple : 3,37 cm, arrondi au centimètre, donne 3 cm.</p>
+      <p>Chaque canal d'un pixel a 256 niveaux (8 bits). Trois canaux donnent 256³ = 16 777 216 couleurs possibles. ColorCatchers garde les 5 bits les plus forts de chaque canal (<code>r ≫ 3</code>). Chaque canal a alors 32 niveaux, et l'image a au maximum 32³ = 32 768 couleurs.</p>
+      <p>Chaque couleur quantifiée est une case. Le tableau qui compte les pixels de chaque case s'appelle un histogramme.</p>
+    </div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-quant" width="720" height="540" aria-label="Image quantifiée"></canvas></div>
+      <div class="panel">
+        <div class="ctl"><label for="q-bits">Bits par canal</label><output id="q-bits-out">5</output>
+          <input type="range" id="q-bits" min="1" max="8" step="1" value="5">
+          <small>ColorCatchers utilise 5 bits. Essayez 2 ou 3 bits pour voir l'effet.</small></div>
+        <div class="stats">
+          <div class="stat"><span>Niveaux par canal</span><b id="q-levels"></b></div>
+          <div class="stat"><span>Cases possibles</span><b id="q-bins"></b></div>
+          <div class="stat"><span>Cases utilisées</span><b id="q-used"></b></div>
+          <div class="stat"><span>Mémoire de l'histogramme</span><b id="q-mem"></b></div>
+        </div>
+      </div>
+    </div>
+    <div class="why"><h3>Pourquoi quantifier</h3><p>Les couleurs très proches tombent dans la même case, donc une partie du bruit du capteur disparaît. La taille du calcul ne dépend plus de l'image : l'histogramme a toujours 32 768 cases (128 Ko). Avec 5 bits, l'image change très peu. Avec moins de bits, les dégradés deviennent des bandes.</p><p>Un outil qui réduit une image à quelques couleurs s'appelle un <em>quantificateur de couleurs</em> <span class="tech">color quantizer</span>. Le module <code>ColorCutQuantizer</code> fait la quantification, puis la coupe médiane.</p></div>
+    <h2>La coupe médiane</h2>
+    <div class="prose">
+      <p>L'application groupe les cases en 55 boîtes. La méthode s'appelle la <em>coupe médiane</em> <span class="tech">median cut</span>. Le module de l'application s'appelle <code>ColorCutQuantizer</code> : un quantificateur de couleurs par coupe médiane.</p>
+      <ol>
+        <li>L'application réduit chaque canal (R, V, B) à 32 niveaux. Les couleurs très proches vont dans la même case.</li>
+        <li>L'application met toutes les cases dans une seule boîte.</li>
+        <li>Elle prend la boîte avec le plus grand volume.</li>
+        <li>Elle coupe cette boîte en deux, sur son côté le plus long. La coupe met la moitié des pixels de chaque côté.</li>
+        <li>Elle répète les étapes 3 et 4 jusqu'à 55 boîtes.</li>
+      </ol>
+    </div>
+    
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-cut" width="640" height="640" aria-label="Coupe médiane dans le plan rouge, bleu"></canvas></div>
+      <div class="panel">
+        <div class="thumbs" id="cut-thumbs" role="group" aria-label="Image"></div>
+        <div class="ctl"><label for="cut-n">Nombre de boîtes</label><output id="cut-n-out">1</output>
+          <input type="range" id="cut-n" min="1" max="55" step="1" value="8"></div>
+        <button type="button" id="cut-play">Animer les coupes</button>
+        <div><small class="figcap">Couleur moyenne de chaque boîte (en haut) et couleur la plus vive (en bas) :</small>
+          <div id="cut-swatches" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:8px"></div></div>
+      </div>
+    </div>
+    <p class="figcap">Ce graphique montre seulement deux canaux : R (horizontal) et B (vertical). L'application coupe dans les trois canaux R, V et B.</p>
+    <div class="why"><h3>Pourquoi la coupe médiane</h3><p>L'application coupe d'abord la boîte la plus grande. Une grande boîte contient des couleurs très différentes, et la couper sépare ces couleurs. Ainsi, une petite couleur distincte garde sa propre boîte.</p><p>La coupe est à la médiane, donc chaque moitié a le même nombre de pixels. Les boîtes deviennent soit une grande zone uniforme, soit une petite zone distincte. Les deux sont des candidats utiles.</p><p>L'algorithme k-means commence avec des centres aléatoires et répète des calculs jusqu'à la convergence. Il est plus lent, et deux images presque identiques peuvent donner des groupes différents. La coupe médiane est déterministe, fait une seule passe et travaille sur des nombres entiers. En vidéo, cette stabilité est nécessaire : un petit changement de l'image déplace peu de cases, donc les boîtes bougent peu.</p></div>
+    <div class="prose">
+      <h3>Ce que chaque boîte donne</h3>
+      <p>Chaque boîte donne trois valeurs : la couleur moyenne, calculée dans OKLab ; la couleur la plus vive, c'est-à-dire la case avec la plus grande chroma ; et la population, le nombre de pixels de la boîte.</p>
+      <p>La coupe se fait dans le RGB, alors que les moyennes se font dans OKLab. Le calcul sur des entiers RGB est rapide et stable.</p>
+    </div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Réduire les couleurs</td><td><span class="tech">quantification des couleurs (color quantization)</span></td><td>Remplacer des milliers de couleurs par un petit ensemble</td></tr><tr><td>Coupe médiane</td><td><span class="tech">median cut (Heckbert, 1982)</span></td><td>Division récursive des boîtes à la médiane de population</td></tr><tr><td>Quantificateur</td><td><span class="tech">ColorCutQuantizer</span></td><td>Dérivé de l'API Palette d'Android (AndroidX), simplifié</td></tr><tr><td>32 niveaux par canal</td><td><span class="tech">histogramme 15 bits (RGB555)</span></td><td>32 768 cases : (r≫3)≪10 | (g≫3)≪5 | (b≫3)</td></tr><tr><td>Boîte</td><td><span class="tech">vbox</span></td><td>Boîte englobante dans le cube RGB</td></tr><tr><td>Boîte la plus grande</td><td><span class="tech">file de priorité par volume (max-heap)</span></td><td>La boîte au plus grand volume est coupée en premier</td></tr><tr><td>Population</td><td><span class="tech">effectif (population)</span></td><td>Nombre de pixels dans la boîte</td></tr><tr><td>Couleur moyenne</td><td><span class="tech">centroïde pondéré (OKLab)</span></td><td>Moyenne des cases, pondérée par leur effectif</td></tr></tbody></table></div>
+
+  </section>
+
+  <!-- ============================================================ CHOISIR -->
+  <section class="page" data-page="choisir" data-title="Choisir" hidden>
+    <span class="eyebrow">Étape 3 sur 4</span>
+    <h1>Choisir</h1>
+    <div class="prose">
+      <p>L'application choisit la palette parmi les 55 boîtes, qui sont maintenant des candidats. Elle fait deux passes : une passe pour les neutres, puis une passe pour les couleurs.</p>
+    </div>
+    <div class="panel">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <div class="thumbs" id="sel-thumbs" role="group" aria-label="Image"></div>
+        <label class="btn" for="sel-upload" style="display:inline-flex;align-items:center">Charger une image</label>
+        <input type="file" id="sel-upload" accept="image/*" hidden>
+      </div>
+      <div class="cols">
+        <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-select" width="720" height="720" aria-label="Candidats et couleurs choisies dans le plan a, b"></canvas></div>
+        <div class="controls">
+          <img id="sel-preview" alt="Image analysée" style="width:100%;max-height:180px;object-fit:contain;border-radius:6px;background:var(--plot-bg)">
+          <div class="palette" id="sel-palette"></div>
+          <div class="ctl"><label>Nombre de couleurs</label><output id="sel-count-out">5</output>
+            <div class="seg" id="sel-count" role="group" aria-label="Nombre de couleurs" style="grid-column:1/-1"></div></div>
+          <div class="ctl"><label for="sel-spread">Variété</label><output id="sel-spread-out"></output>
+            <input type="range" id="sel-spread" min="0" max="1" step="0.05" value="0.6"><small>Poids de la teinte nouvelle dans le score.</small></div>
+          <div class="ctl"><label for="sel-rep">Distinction</label><output id="sel-rep-out"></output>
+            <input type="range" id="sel-rep" min="0.02" max="0.16" step="0.01" value="0.08"><small>Distance minimale entre deux couleurs, en OKLab.</small></div>
+          <div class="ctl"><label for="sel-tone">Tone</label><output id="sel-tone-out"></output>
+            <input type="range" id="sel-tone" min="0" max="1" step="0.05" value="0.9"><small>Mélange entre la moyenne et le pixel le plus vif.</small></div>
+          <div class="ctl"><label>Équilibre des neutres</label>
+            <div class="seg" id="sel-neutral" role="group" aria-label="Équilibre des neutres" style="grid-column:1/-1">
+              <button type="button" data-v="color">Couleur</button><button type="button" data-v="balanced" aria-pressed="true">Équilibré</button><button type="button" data-v="neutrals">Neutres</button></div></div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>Pas</span><b id="sel-stride"></b></div>
+        <div class="stat"><span>Pixels lus</span><b id="sel-samples"></b></div>
+        <div class="stat"><span>Candidats</span><b id="sel-cands"></b></div>
+        <div class="stat"><span>Seuil neutre</span><b id="sel-thr"></b></div>
+        <div class="stat"><span>Neutres choisis</span><b id="sel-neu"></b></div>
+        <div class="stat"><span>Durée du calcul</span><b id="sel-ms"></b></div>
+      </div>
+      <div class="legend"><span><i class="dash"></i>seuil neutre</span><span><i></i>couleur choisie</span><span><i class="fill"></i>zone d'exclusion</span></div>
+    </div>
+
+    <h2>Passe 1 : les neutres</h2>
+    <div class="prose">
+      <p>L'application réserve jusqu'à 3 places aux noirs, aux gris et aux blancs. Leur chroma est presque nulle, donc un score de couleur vive ne les choisit jamais.</p>
+      <ol>
+        <li>L'application calcule un seuil de chroma <span class="tech">seuil adaptatif</span> pour chaque image. Le seuil est un quart de la chroma au 90<sup>e</sup> percentile, pondérée par la population. Le seuil reste entre 0,02 et 0,045.</li>
+        <li>Un candidat sous le seuil est neutre.</li>
+        <li>Le nombre de places neutres suit la part des pixels neutres. Il y a 3 places neutres au maximum.</li>
+        <li>L'application divise les neutres en trois groupes : sombre (L &lt; 0,34), moyen, et clair (L ≥ 0,66).</li>
+        <li>Un groupe doit contenir au moins 5 % des pixels. Les autres groupes sont ignorés.</li>
+        <li>Dans chaque groupe, l'application prend le candidat avec la plus petite chroma : le gris le plus pur.</li>
+      </ol>
+    </div>
+
+    <div class="why"><h3>Pourquoi cette passe neutre</h3><p>Le noir et le blanc couvrent souvent une grande partie de l'image, mais leur chroma est presque nulle. Sans places réservées, ils n'entrent jamais dans la palette.</p><p>Le seuil change avec l'image. Un beige est une couleur dans une scène grise, et un neutre dans une scène très vive. Un seuil fixe se trompe dans un des deux cas.</p><p>Chaque image contient des gris aux bords des objets (anticrénelage). Ces gris sont invisibles, et la limite de 5 % des pixels les élimine. Dans chaque groupe, l'application prend le gris le plus pur, avec la chroma la plus faible.</p></div>
+    <h2>Passe 2 : les couleurs</h2>
+    <div class="prose">
+      <p>L'application choisit les couleurs une par une <span class="tech">greedy selection</span>. À chaque tour, elle calcule un score pour chaque candidat et prend le meilleur.</p>
+    </div>
+    <div class="formula">score = vivacité                 (chroma ÷ chroma maximale de l'image)
+      + 0,6 × nouveauté        (écart de teinte avec les couleurs déjà choisies)
+      + 0,2 × rareté           (1 − population ÷ population maximale)
+      + 0,3 × fidélité         (proximité avec la palette précédente)</div>
+    <div class="prose">
+      <p>Avant le score, l'application applique deux règles strictes. Elle refuse un candidat si sa distance OKLab à une couleur choisie est inférieure à 0,08 (réglage <em>Distinction</em>), ou si son écart de teinte avec une couleur choisie est inférieur à 25°.</p>
+      <p>Ainsi, la palette ne contient pas deux rouges. Si aucun candidat ne respecte les règles, l'application prend le candidat le plus éloigné des couleurs choisies.</p>
+      </div>
+    <div class="why"><h3>Pourquoi ce score et ces règles</h3><p>La chroma est divisée par la chroma maximale de l'image. Ainsi, la méthode fonctionne pour une scène pastel et pour une scène fluo. Le bonus de rareté protège les petites taches de couleur, qui attirent l'œil mais ont peu de pixels. Sans ce bonus, les grandes zones gagnent toujours.</p><p>Il faut deux règles, car deux rouges peuvent être éloignés par la clarté, par exemple un rouge sombre et un rouge clair. La distance seule les accepte. L'écart de teinte de 25° les refuse.</p><p>Les règles sont strictes. Une pénalité de score peut perdre contre les autres termes du score, et la palette peut alors contenir deux couleurs presque identiques.</p></div>
+    <div class="prose">
+      <p>Pour finir, l'application trie la palette par clarté, du sombre au clair. Si la palette est incomplète, elle ajoute des candidats restants.</p>
+    </div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Seuil neutre</td><td><span class="tech">seuil adaptatif (percentile pondéré)</span></td><td>p90 de la chroma pondéré par la population × 0,25, borné [0,02 ; 0,045]</td></tr><tr><td>Places réservées</td><td><span class="tech">réservation de créneaux (slot reservation)</span></td><td>Budget neutre = round(N × part neutre), 3 au maximum</td></tr><tr><td>Groupes sombre, moyen, clair</td><td><span class="tech">bandes de clarté</span></td><td>L < 0,34 ; 0,34–0,66 ; ≥ 0,66 ; seuil de masse 5 %</td></tr><tr><td>Choisir une par une</td><td><span class="tech">sélection gloutonne (greedy selection)</span></td><td>À chaque tour, le meilleur score gagne, sans retour arrière</td></tr><tr><td>Zone d'exclusion</td><td><span class="tech">contrainte de répulsion (hard constraint)</span></td><td>Boule ΔE OK de rayon 0,08 + coin de teinte de 25°</td></tr><tr><td>Candidat le plus éloigné</td><td><span class="tech">farthest-point sampling</span></td><td>Repli si aucun candidat ne respecte les contraintes</td></tr><tr><td>Fidélité</td><td><span class="tech">hystérésis</span></td><td>Bonus linéaire, de 1 à 0 entre ΔE 0 et 0,1 de la palette précédente</td></tr><tr><td>Rareté</td><td><span class="tech">normalisation par la masse maximale</span></td><td>1 − population ÷ population maximale</td></tr></tbody></table></div>
+
+  </section>
+
+  <!-- ============================================================ LISSER -->
+  <section class="page" data-page="lisser" data-title="Lisser" hidden>
+    <span class="eyebrow">Étape 4 sur 4</span>
+    <h1>Lisser</h1>
+    <div class="prose">
+      <p>L'application utilise cinq protections pour que la palette ne clignote pas quand la caméra bouge ou quand le capteur ajoute du bruit. La première, la fidélité, agit pendant le choix. Les quatre autres agissent sur le fil principal, avant l'affichage.</p>
+    </div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-smooth" width="720" height="440" aria-label="Signal brut et signal lissé dans le temps"></canvas></div>
+      <div class="panel">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><div id="sm-raw" style="height:64px;border-radius:8px"></div><small class="figcap">Extraction brute</small></div>
+          <div><div id="sm-disp" style="height:64px;border-radius:8px"></div><small class="figcap">Couleur affichée</small></div>
+        </div>
+        <div class="ctl"><label for="sm-noise">Bruit du capteur</label><output id="sm-noise-out"></output>
+          <input type="range" id="sm-noise" min="0" max="0.08" step="0.005" value="0.03"></div>
+        <div class="seg" role="group" aria-label="Protections">
+          <button type="button" id="sm-avg" aria-pressed="true">Moyenne glissante</button>
+          <button type="button" id="sm-dead" aria-pressed="true">Zone morte</button>
+          <button type="button" id="sm-lerp" aria-pressed="true">Lissage exponentiel</button>
+        </div>
+        <button type="button" id="sm-pause">Pause</button>
+      </div>
+    </div>
+    <p class="figcap">Simulation : une couleur change toutes les 4 secondes. Les points gris sont les extractions brutes. La ligne jaune est la couleur affichée. Désactivez une protection pour voir son effet.</p>
+    <div class="why"><h3>Pourquoi chaque protection</h3><p>Fidélité : deux candidats avec presque le même score (0,612 et 0,609) échangent leur place à chaque image. Le bonus donne l'avantage à la couleur déjà affichée. Pour changer, un rival doit être nettement meilleur. Quand la scène change vraiment, les nouveaux candidats sont loin des anciens, et le bonus est nul.</p><p>Alignement : les couleurs extraites n'ont pas d'ordre fixe. Sans alignement, deux couleurs qui échangent leur place semblent changer toutes les deux.</p><p>Moyenne glissante : le bruit du capteur est aléatoire. La moyenne de 5 mesures divise le bruit par √5 ≈ 2,2. L'inconvénient est un retard d'environ une demi-seconde. La moyenne est calculée dans OKLab, car une moyenne en sRGB assombrit les mélanges.</p><p>Zone morte : le seuil de perception est environ ΔE OK 0,02. La zone morte (0,04) est deux fois ce seuil. Ainsi, le scintillement invisible ne produit aucun mouvement, et l'écran ne se redessine pas.</p><p>Lissage exponentiel : à chaque image de l'écran, <code>x ← x + 0,16 × (cible − x)</code>. Le mouvement est rapide au début, puis lent. Après 17 images (≈ 0,3 s à 60 Hz), la couleur a fait 95 % du chemin. Sous un écart de 0,01, elle s'arrête exactement sur la cible.</p></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Protection</th><th>Action</th><th>Valeur</th></tr></thead>
+      <tbody>
+        <tr><td>Fidélité <span class="tech">hystérésis</span></td><td>Un candidat proche de la palette précédente reçoit un bonus de score. Le bonus diminue jusqu'à zéro à une distance de 0,1.</td><td class="num">poids 0,3</td></tr>
+        <tr><td>Alignement <span class="tech">appariement glouton</span></td><td>L'application associe chaque nouvelle couleur à la case la plus proche de la palette précédente. Ainsi, deux couleurs ne changent pas de place.</td><td class="num">sans réglage</td></tr>
+        <tr><td>Moyenne glissante <span class="tech">simple moving average</span></td><td>L'application fait la moyenne des 5 dernières extractions, en OKLab.</td><td class="num">≈ 1 s</td></tr>
+        <tr><td>Zone morte <span class="tech">deadband</span></td><td>Un changement plus petit que le seuil ne modifie pas l'affichage.</td><td class="num">ΔE 0,04</td></tr>
+        <tr><td>Lissage exponentiel <span class="tech">EMA</span></td><td>Au-delà de la zone morte, la couleur affichée avance de 16 % de l'écart à chaque image. Elle s'arrête quand l'écart est sous 0,01.</td><td class="num">α = 0,16</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Fidélité</td><td><span class="tech">hystérésis (selection hysteresis)</span></td><td>Le choix précédent reçoit un bonus ; un rival doit être nettement meilleur</td></tr><tr><td>Alignement</td><td><span class="tech">appariement glouton (greedy assignment)</span></td><td>Approximation de l'algorithme hongrois : paires les plus proches d'abord</td></tr><tr><td>Moyenne glissante</td><td><span class="tech">simple moving average</span></td><td>Filtre à fenêtre rectangulaire (boxcar), 5 extractions ≈ 1 s</td></tr><tr><td>Zone morte</td><td><span class="tech">deadband</span></td><td>Aucun changement si ΔE OK < 0,04 (≈ 2 × le seuil visible)</td></tr><tr><td>Lissage exponentiel</td><td><span class="tech">EMA, lerp</span></td><td>Filtre passe-bas du premier ordre : x ← x + α (cible − x), α = 0,16</td></tr></tbody></table></div>
+    <div class="note"><b>Note</b><p>L'application n'utilise pas de filtre de Kalman. Ce filtre, utilisé par la NASA pour les missions Apollo, demande un modèle du mouvement et du bruit. La moyenne glissante, la zone morte et le lissage exponentiel suffisent pour une palette.</p></div>
+    <div class="note"><b>Attention</b><p>La fidélité utilise l'extraction brute précédente, et non la couleur affichée. Avec la couleur affichée, les deux mécanismes s'amplifient et la palette s'éloigne de la scène.</p></div>
+  </section>
+
+  <!-- ============================================================ UNE COULEUR -->
+  <section class="page" data-page="une-couleur" data-title="Mode une couleur" hidden>
+    <span class="eyebrow">Cas particulier</span>
+    <h1>Mode une couleur</h1>
+    <div class="prose">
+      <p>En mode une couleur, l'application donne la couleur et le nom de l'objet sous une croix, au centre de l'image. Elle lit cette couleur dix fois par seconde et n'utilise pas les étapes 2 et 3.</p>
+      <ol>
+        <li>L'application lit un carré de 9 × 9 pixels sous la croix.</li>
+        <li>Elle calcule la moyenne de ces 81 pixels.</li>
+        <li>Elle lisse cette couleur (zone morte et lissage exponentiel).</li>
+        <li>Elle trouve le nom de la couleur dans la liste <code>color-name-list</code>.</li>
+        <li>Elle trouve la référence RAL Classic la plus proche avec la formule ΔE2000 <span class="tech">CIEDE2000</span>.</li>
+      </ol>
+    </div>
+    <div class="why"><h3>Pourquoi ces choix</h3><p>Vous visez un objet précis, donc la découpe et le choix d'une palette ne sont pas utiles. Un pixel seul contient du bruit et de la texture. La moyenne d'un carré de 9 × 9 pixels divise le bruit par 9.</p><p>La formule CIEDE2000 est la norme de l'industrie pour les tolérances de peinture. Les références RAL sont définies pour ce type de comparaison.</p></div>
+    <div class="cols">
+      <div class="vf"><span class="c1"></span><span class="c2"></span><canvas id="cv-cross" width="720" height="540" aria-label="Image avec une croix de visée"></canvas></div>
+      <div class="panel">
+        <canvas id="cv-cross-zoom" width="270" height="270" aria-label="Agrandissement 9 par 9 pixels" style="max-width:200px"></canvas>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div id="cr-avg" style="width:72px;height:72px;border-radius:8px;flex:none"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><b>Moyenne 9 × 9</b><span class="mono" id="cr-hex"></span></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div id="cr-ral" style="width:72px;height:72px;border-radius:8px;flex:none"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><b id="cr-ral-code"></b><span id="cr-ral-name" class="figcap"></span><span class="mono" id="cr-de"></span></div>
+        </div>
+        <small class="figcap">Touchez l'image pour déplacer la croix.</small>
+      </div>
+    </div>
+    <h3>Termes techniques</h3>
+    <div class="table-wrap"><table class="techtable"><thead><tr><th>Terme simple</th><th>Terme technique</th><th>Détail</th></tr></thead><tbody><tr><td>Moyenne 9 × 9</td><td><span class="tech">filtre moyenneur (box filter)</span></td><td>81 pixels lus via un ImageBitmap recadré, 10 fois par seconde</td></tr><tr><td>Lissage</td><td><span class="tech">deadband + lissage exponentiel</span></td><td>Seuil 12 (RGB), α = 0,18</td></tr><tr><td>Formule ΔE2000</td><td><span class="tech">CIEDE2000 (ΔE₀₀)</span></td><td>Écart de couleur CIE, calculé dans CIELAB</td></tr><tr><td>Trouver la référence</td><td><span class="tech">recherche du plus proche voisin</span></td><td>Comparaison avec les 213 couleurs RAL Classic</td></tr></tbody></table></div>
+    <div class="note"><b>Note</b><p>ΔE2000 mesure l'écart visible entre deux couleurs. Une valeur sous 2 est difficile à voir. Une valeur au-dessus de 5 est facile à voir.</p></div>
+  </section>
+
+  <!-- ============================================================ GLOSSAIRE -->
+  <section class="page" data-page="glossaire" data-title="Glossaire" hidden>
+    <span class="eyebrow">Référence</span>
+    <h1>Glossaire et méthode d'écriture</h1>
+    <h2>Termes</h2>
+    <dl class="gloss">
+      <dt>Boîte</dt><dd>Groupe de couleurs proches, créé par la coupe médiane.</dd>
+      <dt>Candidat</dt><dd>Boîte qui peut entrer dans la palette.</dd>
+      <dt>Chroma (C)</dt><dd>Intensité d'une couleur. Distance à l'axe des gris dans OKLab.</dd>
+      <dt>Clarté (L)</dt><dd>Luminosité perçue, de 0 (noir) à 1 (blanc).</dd>
+      <dt>Coupe médiane</dt><dd>Méthode qui coupe une boîte en deux parties avec le même nombre de pixels. En anglais : <span class="tech">median cut</span>.</dd>
+      <dt>ΔE (delta E)</dt><dd>Écart visible entre deux couleurs. ColorCatchers utilise ΔE OKLab pour la palette et ΔE2000 pour le RAL.</dd>
+      <dt>Échantillon</dt><dd>Ensemble des pixels lus. Les autres pixels sont ignorés.</dd>
+      <dt>Fidélité</dt><dd>Bonus de score pour un candidat proche de la palette précédente.</dd>
+      <dt>Histogramme</dt><dd>Tableau qui compte les pixels de chaque case de couleur.</dd>
+      <dt>Lissage exponentiel</dt><dd>À chaque image de l'écran, la couleur affichée avance de 16 % de l'écart avec sa cible.</dd>
+      <dt>Moyenne glissante</dt><dd>Moyenne des 5 dernières extractions, calculée dans OKLab.</dd>
+      <dt>Neutre</dt><dd>Candidat avec une chroma sous le seuil : noir, gris ou blanc.</dd>
+      <dt>OKLab</dt><dd>Espace de couleur où une distance égale donne une différence visible égale.</dd>
+      <dt>Pas</dt><dd>Intervalle entre deux pixels lus.</dd>
+      <dt>Quantifier</dt><dd>Remplacer une valeur précise par la valeur la plus proche dans une petite liste. En anglais : <span class="tech">quantize</span>.</dd>
+      <dt>Population</dt><dd>Nombre de pixels dans une boîte.</dd>
+      <dt>Teinte (h)</dt><dd>Angle de la couleur autour de l'axe des gris : rouge, jaune, vert, bleu.</dd>
+      <dt>Tone</dt><dd>Réglage du mélange entre la couleur moyenne et la couleur la plus vive.</dd>
+      <dt>Zone d'exclusion</dt><dd>Zone autour d'une couleur choisie. Un candidat dans cette zone est refusé.</dd>
+      <dt>Zone morte</dt><dd>Seuil sous lequel un changement de couleur ne modifie pas l'affichage.</dd>
+    </dl>
+    <h2>Méthode d'écriture</h2>
+    <div class="prose">
+      <p>Ce texte suit les règles de l'ASD-STE100 (Simplified Technical English). Ces règles sont écrites pour l'anglais. Ce site applique les mêmes principes au français :</p>
+      <ul>
+        <li>Un terme a un seul sens. Un concept a un seul terme. Par exemple, « boîte » désigne toujours un groupe de la coupe médiane.</li>
+        <li>Une phrase de procédure a 20 mots au maximum. Une phrase descriptive a 25 mots au maximum.</li>
+        <li>Une phrase donne une seule information.</li>
+        <li>Chaque terme simple a son terme technique à côté. Les tableaux « Termes techniques » donnent les deux.</li>
+        <li>Le texte utilise la voix active : « L'application calcule », et pas « Il est calculé ».</li>
+        <li>Les procédures sont des listes numérotées, dans l'ordre des actions.</li>
+        <li>Les mises en garde commencent par « Attention ». Les informations utiles commencent par « Note ».</li>
+        <li>Chaque chapitre commence par le résultat, puis donne le détail.</li>
+        <li>Le texte dit les choses littéralement, sans métaphore.</li>
+      </ul>
+    </div>
+    <h2>Fichiers source</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fichier</th><th>Rôle</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/modules/palette-pixel-pack.js</code></td><td>Étape 1 : pas et lecture des pixels</td></tr>
+        <tr><td><code>src/modules/color-cut-quantizer.js</code></td><td>Étape 2 : coupe médiane, moyenne et couleur vive</td></tr>
+        <tr><td><code>src/modules/hybrid-selector.js</code></td><td>Étape 3 : seuil neutre, passes neutre et couleur</td></tr>
+        <tr><td><code>src/modules/color-smoothing.js</code></td><td>Étape 4 : alignement, moyenne, zone morte, glissement</td></tr>
+        <tr><td><code>src/modules/color-space-oklch.js</code></td><td>Conversions sRGB ↔ OKLab</td></tr>
+        <tr><td><code>src/modules/app/ral-preview.js</code></td><td>Mode une couleur : nom et RAL</td></tr>
+        <tr><td><code>src/app-settings.js</code></td><td>Valeurs par défaut des réglages</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  </main>
+</div>
+
+<script src="lab.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const Lab = window.PaletLab;
+  const fr = (v, d = 2) => Number(v).toFixed(d).replace(".", ",");
+  const int = (v) => Math.round(v).toLocaleString("fr-FR");
+  const hex = ({ r, g, b }) => "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const SAMPLES = [
+    { id: "16", alt: "Formes géométriques colorées" },
+    { id: "fish", alt: "Poisson et kakis, estampe" },
+    { id: "05", alt: "Chambre jaune et bleue" },
+    { id: "northern-lights", alt: "Aurore boréale" },
+    { id: "sleepingcat", alt: "Chat blanc sur fond vert" },
+    { id: "30", alt: "Radio cassette jaune" },
+  ];
+  const imgCache = new Map();
+  function loadImage(src) {
+    if (!imgCache.has(src)) imgCache.set(src, new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }));
+    return imgCache.get(src);
+  }
+  function pixelsOf(img, maxSide = 720) {
+    const k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0, w, h);
+    return { w, h, data: x.getImageData(0, 0, w, h).data };
+  }
+  function thumbs(container, onPick, initial) {
+    container.innerHTML = "";
+    for (const s of SAMPLES) {
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", String(s.id === initial)); b.title = s.alt;
+      b.innerHTML = `<img src="img/${s.id}.jpg" alt="${s.alt}">`;
+      b.addEventListener("click", () => { $$("button", container).forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); onPick(`img/${s.id}.jpg`); });
+      container.appendChild(b);
+    }
+  }
+  function setupCanvas(cv) { return cv.getContext("2d"); }
+  // ab-plane helper: maps OKLab a,b to canvas pixels.
+  function abMap(cv, extent) { const s = cv.width / (2 * extent); return { x: (a) => cv.width / 2 + a * s, y: (b) => cv.height / 2 - b * s, s }; }
+  function drawAxes(x, cv, m, labels = true) {
+    x.strokeStyle = css("--line-strong"); x.lineWidth = 1;
+    x.beginPath(); x.moveTo(0, cv.height / 2); x.lineTo(cv.width, cv.height / 2); x.moveTo(cv.width / 2, 0); x.lineTo(cv.width / 2, cv.height); x.stroke();
+    if (labels) { x.fillStyle = css("--muted"); x.font = `22px ${css("--font-body")}`; x.fillText("a", cv.width - 24, cv.height / 2 - 10); x.fillText("b", cv.width / 2 + 10, 26); }
+  }
+
+  // ---------------------------------------------------------------- router
+  const pages = $$(".page");
+  const toc = $("#toc"), mnav = $("#mobile-nav");
+  const stepNums = { echantillonner: 1, decouper: 2, choisir: 3, lisser: 4 };
+  pages.forEach((p, i) => {
+    const id = p.dataset.page, title = p.dataset.title;
+    if (id === "echantillonner" || id === "une-couleur") { const li = document.createElement("li"); li.className = "sep"; li.setAttribute("aria-hidden", "true"); toc.appendChild(li); }
+    const li = document.createElement("li");
+    li.innerHTML = `<a href="#${id}"><span class="n">${stepNums[id] ?? ""}</span><span>${title}</span></a>`;
+    toc.appendChild(li);
+    const o = document.createElement("option"); o.value = id; o.textContent = (stepNums[id] ? stepNums[id] + ". " : "") + title; mnav.appendChild(o);
+    const prev = pages[i - 1], next = pages[i + 1];
+    const pager = document.createElement("nav"); pager.className = "pager"; pager.setAttribute("aria-label", "Chapitre précédent et suivant");
+    if (prev) pager.insertAdjacentHTML("beforeend", `<a href="#${prev.dataset.page}"><span>← Précédent</span>${prev.dataset.title}</a>`);
+    if (next) pager.insertAdjacentHTML("beforeend", `<a class="next" href="#${next.dataset.page}"><span>Suivant →</span>${next.dataset.title}</a>`);
+    p.appendChild(pager);
+  });
+  mnav.addEventListener("change", () => { location.hash = mnav.value; });
+  const inits = {};
+  const started = new Set();
+  function route() {
+    const id = (location.hash || "#accueil").slice(1);
+    const page = pages.find((p) => p.dataset.page === id) ?? pages[0];
+    pages.forEach((p) => (p.hidden = p !== page));
+    $$("a", toc).forEach((a) => a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + page.dataset.page) || a.removeAttribute("aria-current"));
+    $$("a", toc).forEach((a) => { if (a.getAttribute("href") === "#" + page.dataset.page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    mnav.value = page.dataset.page;
+    document.title = page.dataset.page === "accueil" ? "ColorCatchers, l'extraction des couleurs" : `${page.dataset.title} · ColorCatchers`;
+    if (page.dataset.page !== "accueil") { const v = $("#explainer-video"); if (v && !v.paused) v.pause(); }
+    if (!started.has(page.dataset.page) && inits[page.dataset.page]) { started.add(page.dataset.page); inits[page.dataset.page](); }
+    redrawCurrent = redraws[page.dataset.page] ?? null;
+    if (redrawCurrent) redrawCurrent();
+    window.scrollTo(0, 0);
+  }
+  const redraws = {};
+  let redrawCurrent = null;
+  window.addEventListener("hashchange", route);
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, select, textarea, video") || e.metaKey || e.ctrlKey || e.altKey) return;
+    const i = pages.findIndex((p) => !p.hidden);
+    if (e.key === "ArrowRight" && pages[i + 1]) location.hash = pages[i + 1].dataset.page;
+    if (e.key === "ArrowLeft" && pages[i - 1]) location.hash = pages[i - 1].dataset.page;
+  });
+
+  // ---------------------------------------------------------------- theme
+  const themeBtns = $$("[data-theme-choice]");
+  function applyTheme(choice) {
+    if (choice === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", choice);
+    themeBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeChoice === choice)));
+    try { localStorage.setItem("paletcam-doc-theme", choice); } catch {}
+    requestAnimationFrame(() => redrawCurrent && redrawCurrent());
+  }
+  themeBtns.forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.themeChoice)));
+  let savedTheme = "system"; try { savedTheme = localStorage.getItem("paletcam-doc-theme") || "system"; } catch {}
+  themeBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeChoice === savedTheme)));
+  if (savedTheme !== "system") document.documentElement.setAttribute("data-theme", savedTheme);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redrawCurrent && redrawCurrent());
+  new MutationObserver(() => redrawCurrent && redrawCurrent()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------------------------------------------------------------- probleme
+  inits.probleme = () => {
+    const cv = $("#cv-cloud"), x = setupCanvas(cv);
+    let pts = [], seed = 3;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = (m, s) => m + s * Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+    function make() {
+      pts = []; const h0 = (29 * Math.PI) / 180;
+      for (let i = 0; i < 320; i++) {
+        const k = rnd(); let L, C;
+        if (k < 0.5) { L = gauss(0.56, 0.04); C = Math.max(0.02, gauss(0.18, 0.025)); }
+        else if (k < 0.65) { L = 0.74 + rnd() * 0.18; C = 0.02 + rnd() * 0.07; }
+        else if (k < 0.82) { L = 0.22 + rnd() * 0.16; C = 0.04 + rnd() * 0.07; }
+        else { const t = 0.25 + rnd() * 0.65; L = 0.56 * (1 - t) + 0.82 * t; C = 0.18 * (1 - t) + 0.035 * t; }
+        const h = h0 + gauss(0, (7 * Math.PI) / 180);
+        pts.push({ L, a: C * Math.cos(h), b: C * Math.sin(h) });
+      }
+    }
+    function draw() {
+      const t = +$("#cloud-tone").value; $("#cloud-tone-out").value = fr(t);
+      const m = abMap(cv, 0.26);
+      x.clearRect(0, 0, cv.width, cv.height); x.fillStyle = css("--plot-bg"); x.fillRect(0, 0, cv.width, cv.height);
+      drawAxes(x, cv, m);
+      for (const p of pts) { x.fillStyle = hex(Lab.oklabToRgb(p.L, p.a, p.b)); x.beginPath(); x.arc(m.x(p.a), m.y(p.b), 4.5, 0, 7); x.fill(); }
+      const mean = pts.reduce((s, p) => ({ L: s.L + p.L / pts.length, a: s.a + p.a / pts.length, b: s.b + p.b / pts.length }), { L: 0, a: 0, b: 0 });
+      const viv = pts.reduce((best, p) => (Math.hypot(p.a, p.b) > Math.hypot(best.a, best.b) ? p : best));
+      const mix = { L: mean.L + (viv.L - mean.L) * t, a: mean.a + (viv.a - mean.a) * t, b: mean.b + (viv.b - mean.b) * t };
+      x.fillStyle = "#9a9a9a"; x.beginPath(); x.arc(cv.width / 2, cv.height / 2, 7, 0, 7); x.fill();
+      x.fillStyle = css("--muted"); x.font = `20px ${css("--font-body")}`; x.fillText("gris", cv.width / 2 - 44, cv.height / 2 + 24);
+      x.setLineDash([6, 6]); x.strokeStyle = css("--muted"); x.lineWidth = 2;
+      x.beginPath(); x.moveTo(m.x(mean.a), m.y(mean.b)); x.lineTo(m.x(viv.a), m.y(viv.b)); x.stroke(); x.setLineDash([]);
+      const ring = (p, r, col, label, dy) => { x.fillStyle = hex(Lab.oklabToRgb(p.L, p.a, p.b)); x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.arc(m.x(p.a), m.y(p.b), r, 0, 7); x.fill(); x.stroke(); if (label) { x.fillStyle = css("--fg"); x.fillText(label, m.x(p.a) + 16, m.y(p.b) + dy); } };
+      ring(mean, 11, css("--fg"), "moyenne", 30);
+      ring(viv, 11, css("--fg"), "le plus vif", -14);
+      ring(mix, 14, css("--accent"), "", 0);
+      $("#cloud-mean").style.background = hex(Lab.oklabToRgb(mean.L, mean.a, mean.b));
+      $("#cloud-mix").style.background = hex(Lab.oklabToRgb(mix.L, mix.a, mix.b));
+      $("#cloud-mean-c").textContent = fr(Math.hypot(mean.a, mean.b), 3);
+      $("#cloud-mix-c").textContent = fr(Math.hypot(mix.a, mix.b), 3);
+    }
+    make();
+    $("#cloud-tone").addEventListener("input", draw);
+    $("#cloud-reroll").addEventListener("click", () => { seed = (seed * 48271) % 2147483647; make(); draw(); });
+    redraws.probleme = draw;
+  };
+
+  // ---------------------------------------------------------------- oklab
+  inits.oklab = () => {
+    const cv = $("#cv-oklab"), x = setupCanvas(cv);
+    const E = 0.34;
+    let pick = { a: 0.08, b: 0.1 };
+    let slice = null, sliceL = -1, sliceTheme = "";
+    function renderSlice(L) {
+      const W = 320, img = new ImageData(W, W), bg = css("--plot-bg");
+      for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+        const a = (i / W - 0.5) * 2 * E, b = (0.5 - j / W) * 2 * E;
+        const lms = [L + 0.3963377774 * a + 0.2158037573 * b, L - 0.1055613458 * a - 0.0638541728 * b, L - 0.0894841775 * a - 1.291485548 * b].map((v) => v ** 3);
+        const lr = 4.0767416621 * lms[0] - 3.3077115913 * lms[1] + 0.2309699292 * lms[2];
+        const lg = -1.2684380046 * lms[0] + 2.6097574011 * lms[1] - 0.3413193965 * lms[2];
+        const lb = -0.0041960863 * lms[0] - 0.7034186147 * lms[1] + 1.707614701 * lms[2];
+        const k = (j * W + i) * 4;
+        if (lr < -0.001 || lg < -0.001 || lb < -0.001 || lr > 1.001 || lg > 1.001 || lb > 1.001) { img.data[k + 3] = 0; continue; }
+        const enc = (c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.max(c, 0) ** (1 / 2.4) - 0.055);
+        img.data[k] = enc(lr); img.data[k + 1] = enc(lg); img.data[k + 2] = enc(lb); img.data[k + 3] = 255;
+      }
+      const off = document.createElement("canvas"); off.width = off.height = W; off.getContext("2d").putImageData(img, 0, 0);
+      return off;
+    }
+    function draw() {
+      const L = +$("#ok-l").value; $("#ok-l-out").value = fr(L);
+      const theme = css("--plot-bg");
+      if (sliceL !== L || sliceTheme !== theme) { slice = renderSlice(L); sliceL = L; sliceTheme = theme; }
+      const m = abMap(cv, E);
+      x.fillStyle = theme; x.fillRect(0, 0, cv.width, cv.height);
+      x.imageSmoothingEnabled = true; x.drawImage(slice, 0, 0, cv.width, cv.height);
+      drawAxes(x, cv, m);
+      x.fillStyle = css("--muted"); x.font = `20px ${css("--font-body")}`;
+      x.fillText("vert", 10, cv.height / 2 + 26); x.fillText("rouge", cv.width - 62, cv.height / 2 + 26);
+      x.fillText("jaune", cv.width / 2 + 10, 56); x.fillText("bleu", cv.width / 2 + 10, cv.height - 14);
+      const px = m.x(pick.a), py = m.y(pick.b);
+      x.strokeStyle = css("--fg"); x.lineWidth = 2;
+      x.beginPath(); x.moveTo(cv.width / 2, cv.height / 2); x.lineTo(px, py); x.stroke();
+      const h = Math.atan2(pick.b, pick.a);
+      x.strokeStyle = css("--accent"); x.lineWidth = 3; x.beginPath(); x.arc(cv.width / 2, cv.height / 2, 46, 0, -h, h > 0); x.stroke();
+      x.beginPath(); x.arc(px, py, 12, 0, 7); x.lineWidth = 3; x.strokeStyle = css("--fg"); x.stroke();
+      const rgb = Lab.oklabToRgb(L, pick.a, pick.b);
+      $("#ok-swatch").style.background = hex(rgb);
+      $("#ok-rl").textContent = fr(L); $("#ok-ra").textContent = fr(pick.a, 3); $("#ok-rb").textContent = fr(pick.b, 3);
+      $("#ok-rc").textContent = fr(Math.hypot(pick.a, pick.b), 3); $("#ok-rh").textContent = Math.round(((h * 180) / Math.PI + 360) % 360) + "°";
+      $("#ok-rgb").textContent = `${rgb.r} ${rgb.g} ${rgb.b}`;
+    }
+    function point(e) {
+      const r = cv.getBoundingClientRect();
+      pick = { a: ((e.clientX - r.left) / r.width - 0.5) * 2 * E, b: (0.5 - (e.clientY - r.top) / r.height) * 2 * E };
+      draw();
+    }
+    cv.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" || e.buttons) point(e); });
+    cv.addEventListener("pointerdown", point);
+    $("#ok-l").addEventListener("input", draw);
+    redraws.oklab = draw;
+  };
+
+  // ---------------------------------------------------------------- echantillonner
+  inits.echantillonner = () => {
+    const sizes = [[640, 480], [1280, 720], [1920, 1080], [2560, 1440], [4032, 3024]];
+    const cv = $("#cv-sample"), x = setupCanvas(cv);
+    let pix = null;
+    loadImage("img/16.jpg").then((img) => { pix = pixelsOf(img); draw(); });
+    function draw() {
+      const [w, h] = sizes[+$("#smp-size").value], max = +$("#smp-max").value;
+      const total = w * h, stride = Math.max(1, Math.ceil(Math.sqrt(total / max)));
+      const read = Math.ceil(w / stride) * Math.ceil(h / stride);
+      $("#smp-size-out").value = `${w} × ${h}`; $("#smp-max-out").value = int(max);
+      $("#smp-total").textContent = int(total); $("#smp-stride").textContent = stride; $("#smp-read").textContent = int(read);
+      $("#smp-share").textContent = fr((100 * read) / total, 1) + " %";
+      x.fillStyle = css("--plot-bg"); x.fillRect(0, 0, cv.width, cv.height);
+      if (!pix) return;
+      const N = 32, cell = cv.width / N, ox = Math.floor(pix.w * 0.55), oy = Math.floor(pix.h * 0.12);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const k = ((oy + j) * pix.w + ox + i) * 4;
+        const kept = i % stride === 0 && j % stride === 0;
+        x.globalAlpha = kept ? 1 : 0.22;
+        x.fillStyle = `rgb(${pix.data[k]},${pix.data[k + 1]},${pix.data[k + 2]})`;
+        x.fillRect(i * cell + 1, j * cell + 1, cell - 2, cell - 2);
+        x.globalAlpha = 1;
+        if (kept) { x.strokeStyle = css("--accent"); x.lineWidth = 3; x.strokeRect(i * cell + 2, j * cell + 2, cell - 4, cell - 4); }
+      }
+    }
+    $("#smp-size").addEventListener("input", draw); $("#smp-max").addEventListener("input", draw);
+    redraws.echantillonner = draw;
+  };
+
+
+  // ---------------------------------------------------------------- quantifier (in decouper)
+  function initQuant() {
+    const cv = $("#cv-quant"), x = setupCanvas(cv);
+    let src = null;
+    loadImage("img/05.jpg").then((img) => { src = pixelsOf(img, 720); cv.width = src.w; cv.height = src.h; drawQ(); });
+    function drawQ() {
+      if (!src) return;
+      const bits = +$("#q-bits").value, sh = 8 - bits, half = sh ? 1 << (sh - 1) : 0;
+      const out = new ImageData(src.w, src.h), used = new Set();
+      for (let i = 0; i < src.data.length; i += 4) {
+        const r = src.data[i] >> sh, g = src.data[i + 1] >> sh, b = src.data[i + 2] >> sh;
+        used.add((r << 16) | (g << 8) | b);
+        out.data[i] = (r << sh) + half; out.data[i + 1] = (g << sh) + half; out.data[i + 2] = (b << sh) + half; out.data[i + 3] = 255;
+      }
+      x.putImageData(out, 0, 0);
+      const levels = 1 << bits, bins = levels ** 3;
+      $("#q-bits-out").value = bits; $("#q-levels").textContent = levels; $("#q-bins").textContent = int(bins);
+      $("#q-used").textContent = int(used.size);
+      const mem = bins * 4; $("#q-mem").textContent = mem >= 1048576 ? fr(mem / 1048576, 0) + " Mo" : mem >= 1024 ? fr(mem / 1024, 0) + " Ko" : mem + " o";
+    }
+    $("#q-bits").addEventListener("input", drawQ);
+  }
+  // ---------------------------------------------------------------- decouper
+  inits.decouper = () => {
+    initQuant();
+    const cv = $("#cv-cut"), x = setupCanvas(cv);
+    let pts = [], q = [], playing = null;
+    function chroma(p) { const o = Lab.rgbToOklab(p[0], p[1], p[2]); return Math.hypot(o.a, o.b); }
+    function cut(n) {
+      let boxes = [q.map((_, i) => i)];
+      const bounds = (idx) => { let x0 = 99, x1 = -1, y0 = 99, y1 = -1; for (const i of idx) { const [a, b] = q[i]; if (a < x0) x0 = a; if (a > x1) x1 = a; if (b < y0) y0 = b; if (b > y1) y1 = b; } return [x0, x1, y0, y1]; };
+      const vol = (idx) => { const [x0, x1, y0, y1] = bounds(idx); return x1 === x0 && y1 === y0 ? -1 : (x1 - x0 + 1) * (y1 - y0 + 1); };
+      while (boxes.length < n) {
+        let k = -1, best = 0; boxes.forEach((b, i) => { const v = vol(b); if (v > best) { best = v; k = i; } });
+        if (k < 0) break;
+        const idx = boxes.splice(k, 1)[0], [x0, x1, y0, y1] = bounds(idx), d = x1 - x0 >= y1 - y0 ? 0 : 1;
+        idx.sort((a, b) => q[a][d] - q[b][d]);
+        const sv = q[idx[idx.length >> 1]][d];
+        let lo = idx.filter((i) => q[i][d] < sv), hi = idx.filter((i) => q[i][d] >= sv);
+        if (!lo.length || !hi.length) { lo = idx.slice(0, idx.length >> 1); hi = idx.slice(idx.length >> 1); }
+        boxes.push(lo, hi);
+      }
+      return boxes.map((idx) => ({ idx, b: bounds(idx) }));
+    }
+    function draw() {
+      const n = +$("#cut-n").value; $("#cut-n-out").value = n;
+      if (!q.length) return; // image not loaded yet
+      const S = cv.width, pad = 30, u = (S - 2 * pad) / 32;
+      x.fillStyle = css("--plot-bg"); x.fillRect(0, 0, S, S);
+      x.strokeStyle = css("--line"); x.lineWidth = 1;
+      for (let k = 0; k <= 32; k++) { x.beginPath(); x.moveTo(pad + k * u, pad); x.lineTo(pad + k * u, S - pad); x.moveTo(pad, pad + k * u); x.lineTo(S - pad, pad + k * u); x.stroke(); }
+      x.fillStyle = css("--muted"); x.font = `20px ${css("--font-body")}`; x.fillText("R →", S - pad - 40, S - 8); x.fillText("B ↑", 4, pad - 8);
+      for (let i = 0; i < pts.length; i++) { const p = pts[i]; x.fillStyle = `rgb(${p[0]},${p[1]},${p[2]})`; x.beginPath(); x.arc(pad + (q[i][0] + 0.5) * u, S - pad - (q[i][1] + 0.5) * u, 3.4, 0, 7); x.fill(); }
+      const boxes = cut(n);
+      x.strokeStyle = css("--accent"); x.lineWidth = 2;
+      for (const { b } of boxes) x.strokeRect(pad + b[0] * u, S - pad - (b[3] + 1) * u, (b[1] - b[0] + 1) * u, (b[3] - b[2] + 1) * u);
+      const sw = $("#cut-swatches"); sw.innerHTML = "";
+      boxes.sort((a, b) => b.idx.length - a.idx.length).forEach(({ idx }) => {
+        const labs = idx.map((i) => Lab.rgbToOklab(...pts[i]));
+        const mean = labs.reduce((s, l) => ({ L: s.L + l.L / labs.length, a: s.a + l.a / labs.length, b: s.b + l.b / labs.length }), { L: 0, a: 0, b: 0 });
+        const viv = idx.reduce((best, i) => (chroma(pts[i]) > chroma(pts[best]) ? i : best), idx[0]);
+        const d = document.createElement("div"); d.style.cssText = "width:22px;display:flex;flex-direction:column;border-radius:3px;overflow:hidden";
+        d.innerHTML = `<i style="height:18px;background:${hex(Lab.oklabToRgb(mean.L, mean.a, mean.b))}"></i><i style="height:18px;background:rgb(${pts[viv].join(",")})"></i>`;
+        d.title = `${idx.length} pixels`;
+        sw.appendChild(d);
+      });
+    }
+    function useImage(src) {
+      loadImage(src).then((img) => {
+        const p = pixelsOf(img, 400); pts = []; let s = 11;
+        const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+        for (let i = 0; i < 1600; i++) { const k = (Math.floor(rnd() * p.w * p.h)) * 4; pts.push([p.data[k], p.data[k + 1], p.data[k + 2]]); }
+        q = pts.map((c) => [c[0] >> 3, c[2] >> 3]);
+        draw();
+      });
+    }
+    thumbs($("#cut-thumbs"), useImage, "05");
+    useImage("img/05.jpg");
+    $("#cut-n").addEventListener("input", draw);
+    $("#cut-play").addEventListener("click", () => {
+      if (playing) { clearInterval(playing); playing = null; $("#cut-play").textContent = "Animer les coupes"; return; }
+      const r = $("#cut-n"); r.value = 1; draw(); $("#cut-play").textContent = "Arrêter";
+      playing = setInterval(() => { if (+r.value >= 55) { clearInterval(playing); playing = null; $("#cut-play").textContent = "Animer les coupes"; return; } r.value = +r.value + 1; draw(); }, 140);
+    });
+    redraws.decouper = draw;
+  };
+
+  // ---------------------------------------------------------------- choisir
+  inits.choisir = () => {
+    const cv = $("#cv-select"), x = setupCanvas(cv);
+    let pix = null, result = null, count = 5, neutral = "balanced";
+    const counts = [3, 4, 5, 6, 7];
+    const cbox = $("#sel-count");
+    counts.forEach((n) => { const b = document.createElement("button"); b.type = "button"; b.textContent = n; b.setAttribute("aria-pressed", String(n === count)); b.addEventListener("click", () => { count = n; $$("button", cbox).forEach((z) => z.setAttribute("aria-pressed", String(+z.textContent === n))); run(); }); cbox.appendChild(b); });
+    $$("#sel-neutral button").forEach((b) => b.addEventListener("click", () => { neutral = b.dataset.v; $$("#sel-neutral button").forEach((z) => z.setAttribute("aria-pressed", String(z === b))); run(); }));
+    function run() {
+      if (!pix) return;
+      const params = { spreadStrength: +$("#sel-spread").value, repulsionRadius: +$("#sel-rep").value, tone: +$("#sel-tone").value, neutralBalance: neutral, rarityStrength: 0.2, loyaltyStrength: 0.3 };
+      $("#sel-spread-out").value = fr(params.spreadStrength); $("#sel-rep-out").value = fr(params.repulsionRadius); $("#sel-tone-out").value = fr(params.tone); $("#sel-count-out").value = count;
+      const t0 = performance.now();
+      result = Lab.runPipeline(pix.data, pix.w, pix.h, count, params);
+      const ms = performance.now() - t0;
+      result.params = params;
+      $("#sel-stride").textContent = result.stride; $("#sel-samples").textContent = int(result.sampleCount);
+      $("#sel-cands").textContent = result.allCandidates.length; $("#sel-thr").textContent = fr(result.neutralThreshold, 3);
+      $("#sel-neu").textContent = result.neutralCount; $("#sel-ms").textContent = fr(ms, 1) + " ms";
+      const pal = $("#sel-palette"); pal.innerHTML = "";
+      for (const c of result.colors) { const d = document.createElement("div"); d.style.background = hex(c); const o = Lab.rgbToOklab(c.r, c.g, c.b); d.style.color = o.L > 0.6 ? "#161616" : "#f0f0f0"; d.textContent = hex(c).slice(1); pal.appendChild(d); }
+      draw();
+    }
+    function draw() {
+      x.fillStyle = css("--plot-bg"); x.fillRect(0, 0, cv.width, cv.height);
+      if (!result) return;
+      const E = 0.3, m = abMap(cv, E);
+      drawAxes(x, cv, m);
+      const maxMass = Math.max(...result.allCandidates.map((c) => c.mass), 1);
+      const rad = (mass) => 3 + 26 * (mass / maxMass) ** 0.33;
+      const picks = result.colors.map((c) => ({ c, o: Lab.rgbToOklab(c.r, c.g, c.b) }));
+      const chromatic = picks.filter((p) => Math.hypot(p.o.a, p.o.b) >= result.neutralThreshold);
+      // forbidden zones
+      for (const p of chromatic) {
+        const h = Math.atan2(p.o.b, p.o.a), w = (25 * Math.PI) / 180;
+        x.fillStyle = css("--accent-dim");
+        x.beginPath(); x.moveTo(cv.width / 2, cv.height / 2); x.arc(cv.width / 2, cv.height / 2, cv.width, -h - w, -h + w); x.closePath(); x.fill();
+        x.beginPath(); x.arc(m.x(p.o.a), m.y(p.o.b), result.params.repulsionRadius * m.s, 0, 7); x.fill();
+      }
+      for (const c of result.allCandidates) { x.fillStyle = hex(c.meanRgb); x.beginPath(); x.arc(m.x(c.a), m.y(c.b), rad(c.mass), 0, 7); x.fill(); x.strokeStyle = css("--plot-bg"); x.lineWidth = 1.5; x.stroke(); }
+      x.setLineDash([7, 6]); x.strokeStyle = css("--accent"); x.lineWidth = 2.5;
+      x.beginPath(); x.arc(cv.width / 2, cv.height / 2, Math.max(4, result.neutralThreshold * m.s), 0, 7); x.stroke(); x.setLineDash([]);
+      for (const p of picks) {
+        x.fillStyle = hex(p.c); x.strokeStyle = css("--accent"); x.lineWidth = 3.5;
+        x.beginPath(); x.arc(m.x(p.o.a), m.y(p.o.b), 13, 0, 7); x.fill(); x.stroke();
+        x.strokeStyle = css("--fg"); x.lineWidth = 1.5; x.beginPath(); x.arc(m.x(p.o.a), m.y(p.o.b), 17, 0, 7); x.stroke();
+      }
+    }
+    function useImage(src) {
+      $("#sel-preview").src = src;
+      loadImage(src).then((img) => { pix = pixelsOf(img); run(); }).catch(() => { $("#sel-ms").textContent = "image illisible"; });
+    }
+    thumbs($("#sel-thumbs"), useImage, "16");
+    useImage("img/16.jpg");
+    ["#sel-spread", "#sel-rep", "#sel-tone"].forEach((s) => $(s).addEventListener("input", run));
+    $("#sel-upload").addEventListener("change", (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      const url = URL.createObjectURL(f);
+      $$("#sel-thumbs button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+      useImage(url);
+    });
+    redraws.choisir = draw;
+  };
+
+  // ---------------------------------------------------------------- lisser
+  inits.lisser = () => {
+    const cv = $("#cv-smooth"), x = setupCanvas(cv);
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let paused = reduced, tSim = 0, last = performance.now(), nextExtract = 0;
+    const targets = [{ L: 0.45, a: 0.17, b: 0.09 }, { L: 0.72, a: -0.05, b: 0.14 }];
+    const hist = []; // {t, raw, disp}
+    let acc = [], disp = null, rawNow = targets[0];
+    let s = 9; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+    const flags = { avg: true, dead: true, lerp: true };
+    ["avg", "dead", "lerp"].forEach((k) => { const b = $("#sm-" + k); b.addEventListener("click", () => { flags[k] = !flags[k]; b.setAttribute("aria-pressed", String(flags[k])); }); });
+    $("#sm-pause").textContent = paused ? "Lecture" : "Pause";
+    $("#sm-pause").addEventListener("click", () => { paused = !paused; $("#sm-pause").textContent = paused ? "Lecture" : "Pause"; last = performance.now(); if (!paused) requestAnimationFrame(tick); });
+    const dist = (p, q) => Math.hypot(p.L - q.L, p.a - q.a, p.b - q.b);
+    let target = { ...targets[0] };
+    function step(dt) {
+      tSim += dt;
+      const tg = targets[Math.floor(tSim / 4) % 2];
+      const noise = +$("#sm-noise").value; $("#sm-noise-out").value = fr(noise, 3);
+      if (tSim >= nextExtract) {
+        nextExtract = tSim + 0.2;
+        rawNow = { L: tg.L + gauss() * noise, a: tg.a + gauss() * noise * 0.6, b: tg.b + gauss() * noise * 0.6 };
+        acc = flags.avg ? [...acc, rawNow].slice(-5) : [rawNow];
+        target = acc.reduce((s2, p) => ({ L: s2.L + p.L / acc.length, a: s2.a + p.a / acc.length, b: s2.b + p.b / acc.length }), { L: 0, a: 0, b: 0 });
+        hist.push({ t: tSim, kind: "raw", v: rawNow.L });
+      }
+      if (!disp) disp = { ...target };
+      if (!flags.dead || dist(target, disp) >= 0.04 || disp.moving) {
+        if (flags.lerp) {
+          const k = 1 - Math.pow(1 - 0.16, dt * 60);
+          disp = { L: disp.L + (target.L - disp.L) * k, a: disp.a + (target.a - disp.a) * k, b: disp.b + (target.b - disp.b) * k, moving: dist(target, disp) > 0.01 };
+        } else disp = { ...target, moving: false };
+      }
+      hist.push({ t: tSim, kind: "disp", v: disp.L });
+      while (hist.length && hist[0].t < tSim - 10) hist.shift();
+    }
+    function draw() {
+      const W = cv.width, H = cv.height, pad = 34;
+      x.fillStyle = css("--plot-bg"); x.fillRect(0, 0, W, H);
+      x.strokeStyle = css("--line"); x.lineWidth = 1;
+      for (let v = 0.3; v <= 0.9; v += 0.1) { const y = H - pad - ((v - 0.3) / 0.6) * (H - 2 * pad); x.beginPath(); x.moveTo(pad, y); x.lineTo(W - 10, y); x.stroke(); }
+      x.fillStyle = css("--muted"); x.font = `18px ${css("--font-body")}`; x.fillText("clarté L", pad, 22); x.fillText("10 dernières secondes", W - 210, H - 8);
+      const tx = (t) => pad + ((t - (tSim - 10)) / 10) * (W - pad - 10), ty = (v) => H - pad - ((v - 0.3) / 0.6) * (H - 2 * pad);
+      x.fillStyle = css("--muted");
+      for (const h of hist) if (h.kind === "raw") { x.beginPath(); x.arc(tx(h.t), ty(h.v), 3.5, 0, 7); x.fill(); }
+      x.strokeStyle = css("--accent"); x.lineWidth = 4; x.beginPath(); let first = true;
+      for (const h of hist) if (h.kind === "disp") { first ? x.moveTo(tx(h.t), ty(h.v)) : x.lineTo(tx(h.t), ty(h.v)); first = false; }
+      x.stroke();
+      $("#sm-raw").style.background = hex(Lab.oklabToRgb(rawNow.L, rawNow.a, rawNow.b));
+      if (disp) $("#sm-disp").style.background = hex(Lab.oklabToRgb(disp.L, disp.a, disp.b));
+    }
+    function tick(now) {
+      if (paused || $('[data-page="lisser"]').hidden) { draw(); return; }
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt); draw(); requestAnimationFrame(tick);
+    }
+    for (let i = 0; i < 300; i++) step(1 / 30);
+    redraws.lisser = () => { draw(); if (!paused) { last = performance.now(); requestAnimationFrame(tick); } };
+  };
+
+  // ---------------------------------------------------------------- une couleur
+  inits["une-couleur"] = () => {
+    const cv = $("#cv-cross"), x = setupCanvas(cv), zc = $("#cv-cross-zoom"), zx = setupCanvas(zc);
+    let pix = null, img = null, pt = { x: 282, y: 240 };
+    loadImage("img/30.jpg").then((i) => { img = i; pix = pixelsOf(i); draw(); });
+    function draw() {
+      if (!pix) return;
+      cv.width = pix.w; cv.height = pix.h;
+      x.drawImage(img, 0, 0, pix.w, pix.h);
+      const cells = []; let s = [0, 0, 0];
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const X = Math.min(pix.w - 1, Math.max(0, pt.x + dx)), Y = Math.min(pix.h - 1, Math.max(0, pt.y + dy)), k = (Y * pix.w + X) * 4;
+        const c = [pix.data[k], pix.data[k + 1], pix.data[k + 2]]; cells.push(c); s[0] += c[0]; s[1] += c[1]; s[2] += c[2];
+      }
+      const avg = { r: Math.round(s[0] / 81), g: Math.round(s[1] / 81), b: Math.round(s[2] / 81) };
+      x.strokeStyle = "#ffffff"; x.lineWidth = 3; x.shadowColor = "rgba(0,0,0,.6)"; x.shadowBlur = 4;
+      const g = 9, L = 30;
+      x.beginPath(); x.moveTo(pt.x - L, pt.y); x.lineTo(pt.x - g, pt.y); x.moveTo(pt.x + g, pt.y); x.lineTo(pt.x + L, pt.y);
+      x.moveTo(pt.x, pt.y - L); x.lineTo(pt.x, pt.y - g); x.moveTo(pt.x, pt.y + g); x.lineTo(pt.x, pt.y + L); x.stroke();
+      x.shadowBlur = 0; x.strokeStyle = "#ffc800"; x.lineWidth = 2; x.strokeRect(pt.x - 4.5, pt.y - 4.5, 9, 9);
+      const c = zc.width / 9;
+      cells.forEach((col, i) => { zx.fillStyle = `rgb(${col.join(",")})`; zx.fillRect((i % 9) * c, Math.floor(i / 9) * c, c - 1, c - 1); });
+      $("#cr-avg").style.background = hex(avg); $("#cr-hex").textContent = hex(avg).toUpperCase();
+      const m = Lab.findClosestRAL(avg.r, avg.g, avg.b, 1)[0];
+      if (m) {
+        $("#cr-ral").style.background = hex(m.ral); $("#cr-ral-code").textContent = m.ral.code; $("#cr-ral-name").textContent = m.ral.name;
+        $("#cr-de").textContent = "ΔE2000 = " + fr(m.deltaE, 1);
+      }
+    }
+    cv.addEventListener("pointerdown", (e) => { const r = cv.getBoundingClientRect(); pt = { x: Math.round(((e.clientX - r.left) / r.width) * cv.width), y: Math.round(((e.clientY - r.top) / r.height) * cv.height) }; draw(); });
+    cv.addEventListener("pointermove", (e) => { if (!e.buttons) return; const r = cv.getBoundingClientRect(); pt = { x: Math.round(((e.clientX - r.left) / r.width) * cv.width), y: Math.round(((e.clientY - r.top) / r.height) * cv.height) }; draw(); });
+    redraws["une-couleur"] = draw;
+  };
+
+  // ---------------------------------------------------------------- video chapters
+  const CHAPTERS = [[0.0, "Introduction"], [29.7, "Problème 1 · La moyenne"], [86.9, "Problème 2 · OKLab"], [196.1, "1 · Échantillonner"], [254.0, "2 · Quantifier"], [325.8, "2 · Coupe médiane"], [389.6, "3 · Les neutres"], [459.5, "3 · Les couleurs"], [526.1, "3 · Le réglage Tone"], [557.6, "4 · Fidélité et alignement"], [622.5, "4 · Filtres"], [695.5, "Mode une couleur"], [742.4, "Résumé"]];
+  const vid = $("#explainer-video"), chap = $("#chapters");
+  CHAPTERS.forEach(([t, label]) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.innerHTML = `<b>${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}</b>${label}`;
+    b.addEventListener("click", () => { vid.currentTime = t; vid.play().catch(() => {}); });
+    chap.appendChild(b);
+  });
+
+
+  // ---------------------------------------------------------------- pipeline overview diagram
+  const PIPE = {"moyenne": {"label": "Le problème de la moyenne", "sub": "théorie", "page": "probleme", "eyebrow": "Théorie", "what": ["Une zone de couleur réelle contient des reflets, des ombres et des bords.", "La moyenne de ces pixels est toujours plus proche du gris que les pixels vifs."], "why": ["La moyenne est toujours à l'intérieur du nuage de points. Les points vifs sont sur le bord.", "Donc, ColorCatchers garde la moyenne et aussi le pixel le plus vif."], "tech": ["enveloppe convexe (convex hull)", "chroma shrinkage"], "nums": ["C vif 0,26", "C moyenne 0,13"], "t": 32.7}, "oklab": {"label": "L'espace OKLab", "sub": "théorie", "page": "oklab", "eyebrow": "Théorie", "what": ["ColorCatchers compare et mélange les couleurs dans OKLab.", "L = clarté, a = vert → rouge, b = bleu → jaune."], "why": ["Le sRGB a une courbe gamma : 128 donne 22 % de la lumière. Une moyenne sRGB assombrit les mélanges.", "Dans le sRGB, deux écarts de 40 peuvent être très visibles ou invisibles. Dans OKLab, une distance égale donne un écart visible égal.", "La teinte est un angle : ColorCatchers ne fait jamais de moyenne sur l'angle."], "tech": ["espace perceptuellement uniforme", "ΔE OK", "OKLCH"], "nums": ["Ottosson 2020", "seuil visible ≈ 0,02"], "t": 89.9}, "cam": {"label": "Image de la caméra", "sub": "≈ 2 millions de pixels", "page": "accueil", "eyebrow": "Entrée", "what": ["La caméra donne une image RGBA, environ 5 fois par seconde.", "Le fil principal envoie l'image au Web Worker."], "why": ["Le Worker calcule hors du fil principal. Ainsi, l'interface ne ralentit pas."], "tech": ["Web Worker", "Uint8ClampedArray RGBA"], "nums": ["≈ 5 extractions / s"], "t": 4.3}, "mode": {"label": "Nombre de couleurs = 1 ?", "sub": "choix du mode", "page": "une-couleur", "eyebrow": "Choix du mode", "what": ["Avec une seule couleur, l'application n'utilise pas la palette.", "Elle lit la couleur sous une croix de visée."], "why": ["Vous visez un objet précis. Les étapes de découpe et de choix ne sont pas utiles."], "tech": ["mode RAL"], "nums": ["nombre : 1, 3 à 7"], "t": 698.5}, "sample": {"label": "Échantillonner", "sub": "1 pixel sur 7", "page": "echantillonner", "eyebrow": "Étape 1", "what": ["L'application lit un pixel sur n, en ligne et en colonne.", "Elle garde au maximum 46 000 pixels."], "why": ["Une grille régulière donne le même poids à chaque zone de l'image.", "La grille est la même à chaque image : pas de clignotement dû à l'échantillon."], "tech": ["stride", "sous-échantillonnage à pas fixe", "ARGB8888"], "nums": ["pas = ⌈√(pixels ÷ 46 000)⌉", "1080p : pas 7", "≈ 42 600 pixels"], "t": 199.1}, "quant": {"label": "Quantifier", "sub": "32 niveaux par canal", "page": "decouper", "eyebrow": "Étape 2a", "what": ["L'application garde les 5 bits forts de chaque canal.", "Chaque pixel tombe dans une des 32 768 cases d'un histogramme."], "why": ["Les couleurs très proches tombent dans la même case : une partie du bruit disparaît.", "La taille du calcul ne dépend plus de l'image."], "tech": ["quantification", "histogramme 15 bits (RGB555)", "color quantizer"], "nums": ["256 → 32 niveaux", "32 768 cases", "128 Ko"], "t": 257.0}, "cut": {"label": "Coupe médiane", "sub": "55 boîtes", "page": "decouper", "eyebrow": "Étape 2b", "what": ["L'application met les cases dans une boîte, puis coupe la boîte la plus grande à la médiane.", "Elle répète jusqu'à 55 boîtes. Chaque boîte donne sa moyenne et sa couleur la plus vive."], "why": ["Couper la plus grande boîte d'abord sépare les couleurs différentes. Une petite couleur distincte garde sa boîte.", "La coupe médiane est déterministe, fait une seule passe et travaille sur des entiers, donc elle est stable en vidéo. k-means part de centres aléatoires."], "tech": ["median cut (Heckbert 1982)", "ColorCutQuantizer", "max-heap par volume"], "nums": ["55 candidats", "moyenne en OKLab"], "t": 325.8}, "thr": {"label": "Seuil neutre", "sub": "adaptatif", "page": "choisir", "eyebrow": "Étape 3a", "what": ["L'application calcule un seuil de chroma pour chaque image.", "Un candidat sous le seuil est neutre (noir, gris, blanc)."], "why": ["Un beige est une couleur dans une scène grise, et un neutre dans une scène vive. Un seuil fixe se trompe."], "tech": ["seuil adaptatif", "percentile pondéré (p90)"], "nums": ["seuil = ¼ × p90", "borné 0,02 – 0,045"], "t": 413.3}, "neutral": {"label": "Passe neutre", "sub": "places réservées", "page": "choisir", "eyebrow": "Étape 3b", "what": ["Les neutres ont des places réservées : 3 au maximum.", "Groupes sombre, moyen, clair. Un groupe doit avoir 5 % des pixels.", "Dans chaque groupe : le gris le plus pur."], "why": ["Le noir et le blanc couvrent souvent une grande partie de l'image, mais un score de vivacité ne les choisit jamais.", "La limite de 5 % élimine les gris des bords des objets."], "tech": ["slot reservation", "bandes de clarté"], "nums": ["L < 0,34 / 0,34–0,66 / ≥ 0,66", "masse ≥ 5 %"], "t": 437.2}, "greedy": {"label": "Sélection gloutonne", "sub": "couleurs vives et distinctes", "page": "choisir", "eyebrow": "Étape 3c", "what": ["L'application choisit les couleurs une par une, avec un score.", "Score = vivacité + 0,6 × nouveauté + 0,2 × rareté + 0,3 × fidélité.", "Un candidat trop proche d'une couleur choisie est refusé."], "why": ["La vivacité est relative à l'image : la méthode marche pour le pastel et le fluo.", "Le bonus de rareté protège les petites taches de couleur, qui attirent l'œil.", "Une règle stricte garantit des couleurs distinctes ; une pénalité peut perdre contre le score."], "tech": ["greedy selection", "contrainte de répulsion", "farthest-point (repli)"], "nums": ["ΔE OK ≥ 0,08", "écart de teinte ≥ 25°"], "t": 459.5}, "tone": {"label": "Tone", "sub": "moyenne ↔ plus vif", "page": "probleme", "eyebrow": "Étape 3d", "what": ["La couleur affichée mélange la moyenne et le pixel le plus vif de la boîte.", "Le mélange est calculé avant les règles de distance."], "why": ["À 1, un seul pixel peut être une erreur du capteur. 10 % de moyenne stabilisent le résultat.", "Le pixel vif existe réellement : ColorCatchers n'invente pas de couleur."], "tech": ["interpolation linéaire (lerp) dans OKLab"], "nums": ["Tone = 0,9"], "t": 526.1}, "sort": {"label": "Tri et complétion", "sub": "palette brute", "page": "choisir", "eyebrow": "Étape 3e", "what": ["L'application trie la palette par clarté, du sombre au clair.", "Si la palette est incomplète, elle ajoute des candidats restants."], "why": ["Le tri par clarté donne des positions de barres stables d'une image à l'autre.", "L'application affiche toujours exactement N couleurs."], "tech": ["padToCount"], "nums": ["N = 3 à 7"], "t": 522.4}, "loyalty": {"label": "Fidélité", "sub": "boucle de retour", "page": "lisser", "eyebrow": "Protection 1", "what": ["La palette brute précédente revient dans le choix suivant.", "Un candidat proche d'une couleur précédente reçoit un bonus."], "why": ["Deux candidats presque égaux échangent leur place à chaque image. Le bonus donne l'avantage à la couleur déjà affichée.", "Quand la scène change vraiment, le bonus est nul."], "tech": ["hystérésis"], "nums": ["bonus 1 → 0 entre ΔE 0 et 0,1", "poids 0,3"], "t": 579.5}, "align": {"label": "Alignement", "sub": "même case, même couleur", "page": "lisser", "eyebrow": "Protection 2", "what": ["L'application associe chaque nouvelle couleur à la case la plus proche de la palette précédente."], "why": ["Les couleurs extraites n'ont pas d'ordre fixe. Sans alignement, deux couleurs qui échangent leur place semblent changer toutes les deux."], "tech": ["appariement glouton (greedy assignment)"], "nums": ["paires les plus proches d'abord"], "t": 606.6}, "sma": {"label": "Moyenne glissante", "sub": "5 extractions", "page": "lisser", "eyebrow": "Protection 3", "what": ["Pour chaque case, l'application fait la moyenne des 5 dernières extractions, dans OKLab."], "why": ["Le bruit du capteur est aléatoire : 5 mesures le divisent par √5 ≈ 2,2.", "Inconvénient : un petit retard."], "tech": ["simple moving average", "boxcar"], "nums": ["fenêtre ≈ 1 s"], "t": 626.2}, "dead": {"label": "Zone morte", "sub": "ΔE < 0,04", "page": "lisser", "eyebrow": "Protection 4", "what": ["Un changement plus petit que 0,04 ne modifie pas l'affichage."], "why": ["Le seuil de perception est environ 0,02. Deux fois ce seuil : le scintillement invisible ne produit aucun mouvement."], "tech": ["deadband"], "nums": ["0,04 = 2 × seuil visible"], "t": 652.6}, "ema": {"label": "Lissage exponentiel", "sub": "α = 0,16", "page": "lisser", "eyebrow": "Protection 5", "what": ["À chaque image de l'écran : x ← x + 0,16 × (cible − x).", "Sous un écart de 0,01, la couleur s'arrête sur la cible."], "why": ["Le mouvement est rapide au début, puis lent : pas de saut visible.", "95 % du chemin en 17 images (≈ 0,3 s)."], "tech": ["EMA", "filtre passe-bas du premier ordre"], "nums": ["α = 0,16", "arrêt < 0,01"], "t": 670.6}, "out": {"label": "Palette affichée", "sub": "vive, variée, stable", "page": "accueil", "eyebrow": "Sortie", "what": ["Les barres de couleur sous l'image de la caméra."], "why": ["Le résultat est vif (Tone), varié (répulsion, nouveauté), stable (fidélité et filtres)."], "tech": [], "nums": ["≈ 5 extractions / s", "affichage à 60 i/s"], "t": 760.7}, "cross": {"label": "Croix 9 × 9", "sub": "81 pixels", "page": "une-couleur", "eyebrow": "Une couleur", "what": ["L'application lit un carré de 9 × 9 pixels sous la croix, 10 fois par seconde."], "why": ["Un pixel seul contient du bruit et de la texture."], "tech": ["ImageBitmap recadré"], "nums": ["10 lectures / s"], "t": 705.7}, "avg9": {"label": "Moyenne + lissage", "sub": "bruit ÷ 9", "page": "une-couleur", "eyebrow": "Une couleur", "what": ["L'application calcule la moyenne des 81 pixels, puis la lisse."], "why": ["La moyenne de 81 pixels divise le bruit par 9."], "tech": ["box filter", "deadband + EMA"], "nums": ["seuil 12 (RGB)", "α = 0,18"], "t": 713.3}, "ral": {"label": "Nom + RAL", "sub": "ΔE2000 · pastille à l'écran", "page": "une-couleur", "eyebrow": "Une couleur", "what": ["L'application trouve le nom de la couleur et la référence RAL Classic la plus proche."], "why": ["CIEDE2000 est la norme de l'industrie pour comparer des peintures."], "tech": ["CIEDE2000", "plus proche voisin"], "nums": ["213 couleurs RAL", "< 2 invisible · > 5 évident"], "t": 724.8}};
+  const EDGES = [["cam", "mode", ""], ["mode", "sample", ""], ["mode", "cross", "1 couleur"], ["sample", "quant", ""], ["quant", "cut", ""], ["cut", "thr", ""], ["thr", "neutral", "neutres"], ["thr", "greedy", "couleurs"], ["greedy", "tone", ""], ["neutral", "sort", ""], ["tone", "sort", ""], ["sort", "align", ""], ["sort", "loyalty", "fb"], ["loyalty", "greedy", "fb"], ["align", "sma", ""], ["sma", "dead", ""], ["dead", "ema", ""], ["ema", "out", ""], ["cross", "avg9", ""], ["avg9", "ral", ""]];
+  const ORDER = ["moyenne","oklab","cam","sample","quant","cut","thr","neutral","greedy","sort","tone","loyalty","align","sma","dead","ema","cross","avg9","ral","out"];
+  const pipe = $("#pipe"), svg = $("#pipe-edges"), detail = $("#pipe-detail");
+  const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  let current = "cam", manualAt = 0;
+  const nodeEl = (k) => pipe.querySelector(`[data-node="${k}"]`);
+  function drawEdges() {
+    if (!pipe.offsetParent) return;
+    const box = pipe.getBoundingClientRect();
+    const r = (k) => { const b = nodeEl(k).getBoundingClientRect(); return { x: b.left - box.left, y: b.top - box.top, w: b.width, h: b.height }; };
+    let out = "";
+    const narrow = matchMedia("(max-width: 860px)").matches;
+    for (const [a, b, label] of EDGES) {
+      // On phones the one-color lane sits at the bottom: skip the two long cross-diagram links.
+      if (narrow && ((a === "mode" && b === "cross") || (a === "ral" && b === "out"))) continue;
+      const A = r(a), B = r(b);
+      const on = a === current || b === current;
+      let d, lx, ly;
+      if (label === "fb" && B.x > A.x + A.w - 4) {
+        // feedback to a node on the right: leave right side, enter from below
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x + B.w / 2, y2 = B.y + B.h;
+        d = `M${x1},${y1} C${x2},${y1} ${x2},${y1} ${x2},${y2}`;
+      } else if (label === "fb" && B.x + B.w < A.x + 4) {
+        // feedback to a node on the left: leave left side, enter its right side
+        const x1 = A.x, y1 = A.y + A.h / 2, x2 = B.x + B.w, y2 = B.y + B.h / 2, mx = (x1 + x2) / 2;
+        d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+      } else if (label === "fb" && B.y < A.y) {
+        // stacked layout (phone): loop back up along the right edge
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x + B.w, y2 = B.y + B.h / 2, bend = Math.max(x1, x2) + 22;
+        d = `M${x1},${y1} C${bend},${y1} ${bend},${y2} ${x2},${y2}`;
+      } else if (B.x >= A.x + A.w - 4 && B.y > A.y) {
+        // branch to the column on the right: leave right side, enter from the top
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x + B.w / 2, y2 = B.y;
+        d = `M${x1},${y1} C${x2},${y1} ${x2},${y1} ${x2},${y2}`; lx = (x1 + x2) / 2; ly = y1 - 8;
+      } else if (Math.abs(A.y - B.y) < 8) {
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x, y2 = B.y + B.h / 2;
+        d = `M${x1},${y1} L${x2},${y2}`; lx = (x1 + x2) / 2; ly = y1 - 8;
+      } else {
+        const x1 = A.x + A.w / 2, y1 = A.y + A.h, x2 = B.x + B.w / 2, y2 = B.y, my = (y1 + y2) / 2;
+        d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; lx = x2; ly = y2 - 10;
+      }
+      out += `<path class="${label === "fb" ? "fb" : ""} ${on ? "on" : ""}" d="${d}" marker-end="url(#arr)"/>`;
+      if (label && label !== "fb" && label !== "x") out += `<text x="${lx}" y="${ly}">${label}</text>`;
+    }
+    svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" style="fill:var(--muted);stroke:none"/></marker></defs>` + out;
+  }
+  function show(k) {
+    current = k;
+    const n = PIPE[k];
+    pipe.querySelectorAll(".pnode").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.node === k)));
+    const li = (xs) => xs.map((x) => `<li>${x}</li>`).join("");
+    detail.innerHTML = `<span class="eyebrow">${n.eyebrow}</span><h3>${n.label}</h3>
+      <h4>Ce que fait l'application</h4><ul>${li(n.what)}</ul>
+      <h4>Pourquoi</h4><ul>${li(n.why)}</ul>
+      ${n.tech.length ? `<h4>Termes techniques</h4><div class="chips">${n.tech.map((t) => `<span class="tech">${t}</span>`).join("")}</div>` : ""}
+      ${n.nums.length ? `<h4>Valeurs</h4><div class="chips">${n.nums.map((t) => `<span class="num">${t}</span>`).join("")}</div>` : ""}
+      <div class="acts"><button type="button" class="btn-primary" id="pipe-play">▶ Vidéo ${fmtT(n.t)}</button>${n.page !== "accueil" ? `<a class="btn" href="#${n.page}">Ouvrir le chapitre →</a>` : ""}</div>`;
+    $("#pipe-play").addEventListener("click", () => {
+      const v = $("#explainer-video"); v.currentTime = n.t; v.play().catch(() => {});
+      v.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+    });
+    drawEdges();
+  }
+  pipe.addEventListener("click", (e) => { const b = e.target.closest(".pnode"); if (b) { manualAt = performance.now(); show(b.dataset.node); } });
+  const step = (d) => { manualAt = performance.now(); const i = ORDER.indexOf(current); show(ORDER[(i + d + ORDER.length) % ORDER.length]); nodeEl(current).focus({ preventScroll: true }); };
+  $("#pipe-prev").addEventListener("click", () => step(-1));
+  $("#pipe-next").addEventListener("click", () => step(1));
+  // Follow the video: highlight the step being narrated.
+  const byTime = Object.entries(PIPE).sort((a, b) => a[1].t - b[1].t);
+  $("#explainer-video").addEventListener("timeupdate", (e) => {
+    const t = e.target.currentTime;
+    let now = null; for (const [k, n] of byTime) if (n.t <= t + 0.2) now = k;
+    pipe.querySelectorAll(".pnode").forEach((el) => el.classList.toggle("is-now", el.dataset.node === now && !e.target.paused));
+    if (now && now !== current && $("#pipe-follow").checked && !e.target.paused && performance.now() - manualAt > 6000) show(now);
+  });
+  $("#explainer-video").addEventListener("pause", () => pipe.querySelectorAll(".is-now").forEach((el) => el.classList.remove("is-now")));
+  new ResizeObserver(() => drawEdges()).observe(pipe);
+  redraws.accueil = () => drawEdges();
+  show("cam");
+
+  route();
+})();
+</script>

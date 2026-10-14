@@ -1,0 +1,176 @@
+<!--
+  PIPELINE OVERVIEW DIAGRAM — explorable map of the whole system, synced with the video.
+  Put it on the home page right under the video. Reference: references/example/paletcam_site.src.html.
+
+  1. CSS: paste the <style> block into the page stylesheet.
+  2. HTML: paste the markup; add one button per node:
+       <button type="button" class="pnode" data-node="ID" style="grid-row:R;grid-column:C" aria-pressed="false">
+         <span class="k">3a</span><b>Label</b><small>one-line sub</small></button>
+     class="pnode theory" for theory/concept nodes (dashed). Grid: 3 columns (main flow spans "1 / 3",
+     a side branch uses column 3). Lanes (.lane) are dashed boxes spanning rows: threads, modes, stages.
+     Add a phone @media block that re-places nodes in 2 columns (see example).
+  3. JS: paste inside the page IIFE (after the redraws object exists, before route()); fill PIPE/EDGES/ORDER.
+     PIPE[id].t = video time where that node is narrated: compute with scripts/node_times.py.
+  Behaviour: click a node -> detail panel (what / why / technical terms / values / ▶ video at t / chapter link);
+  prev/next buttons walk ORDER; while the video plays, the node being narrated is ringed and (if
+  "Suivre la vidéo" is on and the user hasn't clicked for 6 s) the panel follows.
+  Edges are SVG paths recomputed from node positions (ResizeObserver), so layout is pure CSS grid.
+  Why not Mermaid: auto-layout can't be themed with the page tokens, clicked, or synced to the video
+  reliably inside an Artifact; the grid version also reflows to a phone layout.
+-->
+<style>
+/* ---------- pipeline diagram ---------- */
+.pipe-wrap { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.pipe { position: relative; display: grid; grid-template-columns: 1fr 1fr 0.9fr; grid-auto-rows: minmax(54px, auto); gap: 14px 16px; padding: 14px; }
+.pipe svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.pipe .lane { border: 1px dashed var(--line-strong); border-radius: 12px; position: relative; z-index: 0; margin: -7px; }
+.pipe .lane span { position: absolute; top: -10px; left: 12px; background: var(--bg); padding: 0 6px; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+.pnode { position: relative; z-index: 1; align-self: center; display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--fg); cursor: pointer; min-width: 0; transition: border-color .15s, background .15s, box-shadow .15s; }
+.pnode b { font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
+.pnode small { color: var(--muted); font-size: 0.74rem; line-height: 1.25; }
+.pnode .k { position: absolute; top: -8px; right: 8px; font-family: var(--font-mono); font-size: 0.66rem; color: var(--accent); background: var(--bg); padding: 0 4px; border-radius: 4px; }
+.pnode.theory { border-style: dashed; }
+.pnode:hover { border-color: var(--accent); }
+.pipe .pnode[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--fg); }
+.pnode.is-now { box-shadow: 0 0 0 3px var(--accent); }
+.pnode.is-dim { opacity: 0.45; }
+.edges path { fill: none; stroke: var(--line-strong); stroke-width: 1.6; }
+.edges path.fb { stroke: var(--accent); stroke-dasharray: 5 5; }
+.edges path.on { stroke: var(--accent); stroke-width: 2.4; }
+.edges text { fill: var(--muted); font-size: 11px; font-family: var(--font-body); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+.pdetail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 12px; }
+.pdetail h3 { font-size: var(--step-1); }
+.pdetail h4 { margin: 0; font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
+.pdetail ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; font-size: 0.93rem; }
+.pdetail .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pdetail .num { font-family: var(--font-mono); font-size: 0.78rem; border: 1px solid var(--line-strong); border-radius: 6px; padding: 2px 7px; }
+.pdetail .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.pdetail a.btn { text-decoration: none; }
+.pipe-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pipe-tools label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; color: var(--muted); }
+@media (max-width: 860px) {
+  .pipe-wrap { grid-template-columns: minmax(0, 1fr); }
+  .pdetail { position: static; }
+  .pipe { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 860px) {
+  .pipe [data-node="loyalty"] { grid-row: 11 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="align"] { grid-row: 12 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="sma"] { grid-row: 13 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="dead"] { grid-row: 14 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="ema"] { grid-row: 15 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="out"] { grid-row: 18 !important; grid-column: 1 / 3 !important; }
+  .pipe [data-node="cross"] { grid-row: 16 !important; grid-column: 1 !important; }
+  .pipe [data-node="avg9"] { grid-row: 16 !important; grid-column: 2 !important; }
+  .pipe [data-node="ral"] { grid-row: 17 !important; grid-column: 1 / 3 !important; }
+  .pipe .lane-w { grid-row: 4 / 12 !important; }
+  .pipe .lane-m { grid-row: 12 / 16 !important; }
+  .pipe .lane-x { grid-row: 16 / 18 !important; grid-column: 1 / 3 !important; }
+}
+</style>
+
+<h2>Vue d'ensemble du processus</h2>
+    <p class="figcap">Touchez une étape pour lire ce qu'elle fait, pourquoi, et son nom technique. Le bouton ▶ ouvre la vidéo au bon moment. Pendant la lecture, le schéma suit la vidéo.</p>
+    <div class="pipe-tools">
+      <button type="button" id="pipe-prev">← Étape précédente</button>
+      <button type="button" id="pipe-next">Étape suivante →</button>
+      <label><input type="checkbox" id="pipe-follow" checked> Suivre la vidéo</label>
+    </div>
+    <div class="pipe-wrap">
+      <div class="vf"><span class="c1"></span><span class="c2"></span>
+        <div class="pipe" id="pipe">
+          <svg class="edges" id="pipe-edges" aria-hidden="true"></svg>
+          <div class="lane lane-w" style="grid-row:4 / 11;grid-column:1 / 3"><span>Worker · ≈ 5 fois par seconde</span></div>
+          <div class="lane lane-m" style="grid-row:11 / 16;grid-column:1 / 3"><span>Fil principal · à chaque image</span></div>
+          <div class="lane lane-x" style="grid-row:4 / 7;grid-column:3"><span>{{SIDE BRANCH}}</span></div>
+          
+        </div>
+      </div>
+      <aside class="panel pdetail" id="pipe-detail" aria-live="polite"></aside>
+    </div>
+
+<script>
+  // ---------------------------------------------------------------- pipeline overview diagram
+  const PIPE = PIPE_JSON; // {id: {label, sub, page, eyebrow, what[], why[], tech[], nums[], t}}
+  const EDGES = EDGES_JSON; // [[from, to, label]]; label "fb" = dashed feedback loop, "" = none
+  const ORDER = ORDER_JSON; // reading order for the prev/next buttons
+  const pipe = $("#pipe"), svg = $("#pipe-edges"), detail = $("#pipe-detail");
+  const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  let current = "cam", manualAt = 0;
+  const nodeEl = (k) => pipe.querySelector(`[data-node="${k}"]`);
+  function drawEdges() {
+    if (!pipe.offsetParent) return;
+    const box = pipe.getBoundingClientRect();
+    const r = (k) => { const b = nodeEl(k).getBoundingClientRect(); return { x: b.left - box.left, y: b.top - box.top, w: b.width, h: b.height }; };
+    let out = "";
+    const SKIP_ON_PHONE = new Set([]); // long cross-diagram links to hide on phones, e.g. "mode>cross"
+    const narrow = matchMedia("(max-width: 860px)").matches;
+    for (const [a, b, label] of EDGES) {
+      // On phones the one-color lane sits at the bottom: skip the two long cross-diagram links.
+      if (narrow && SKIP_ON_PHONE.has(a + ">" + b)) continue;
+      const A = r(a), B = r(b);
+      const on = a === current || b === current;
+      let d, lx, ly;
+      if (label === "fb" && B.x > A.x + A.w - 4) {
+        // feedback to a node on the right: leave right side, enter from below
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x + B.w / 2, y2 = B.y + B.h;
+        d = `M${x1},${y1} C${x2},${y1} ${x2},${y1} ${x2},${y2}`;
+      } else if (label === "fb" && B.x + B.w < A.x + 4) {
+        // feedback to a node on the left: leave left side, enter its right side
+        const x1 = A.x, y1 = A.y + A.h / 2, x2 = B.x + B.w, y2 = B.y + B.h / 2, mx = (x1 + x2) / 2;
+        d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+      } else if (label === "fb" && B.y < A.y) {
+        // stacked layout (phone): loop back up along the right edge
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x + B.w, y2 = B.y + B.h / 2, bend = Math.max(x1, x2) + 22;
+        d = `M${x1},${y1} C${bend},${y1} ${bend},${y2} ${x2},${y2}`;
+      } else if (B.x >= A.x + A.w - 4 && B.y > A.y) {
+        // branch to the column on the right: leave right side, enter from the top
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x + B.w / 2, y2 = B.y;
+        d = `M${x1},${y1} C${x2},${y1} ${x2},${y1} ${x2},${y2}`; lx = (x1 + x2) / 2; ly = y1 - 8;
+      } else if (Math.abs(A.y - B.y) < 8) {
+        const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x, y2 = B.y + B.h / 2;
+        d = `M${x1},${y1} L${x2},${y2}`; lx = (x1 + x2) / 2; ly = y1 - 8;
+      } else {
+        const x1 = A.x + A.w / 2, y1 = A.y + A.h, x2 = B.x + B.w / 2, y2 = B.y, my = (y1 + y2) / 2;
+        d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; lx = x2; ly = y2 - 10;
+      }
+      out += `<path class="${label === "fb" ? "fb" : ""} ${on ? "on" : ""}" d="${d}" marker-end="url(#arr)"/>`;
+      if (label && label !== "fb" && label !== "x") out += `<text x="${lx}" y="${ly}">${label}</text>`;
+    }
+    svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" style="fill:var(--muted);stroke:none"/></marker></defs>` + out;
+  }
+  function show(k) {
+    current = k;
+    const n = PIPE[k];
+    pipe.querySelectorAll(".pnode").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.node === k)));
+    const li = (xs) => xs.map((x) => `<li>${x}</li>`).join("");
+    detail.innerHTML = `<span class="eyebrow">${n.eyebrow}</span><h3>${n.label}</h3>
+      <h4>Ce que fait l'application</h4><ul>${li(n.what)}</ul>
+      <h4>Pourquoi</h4><ul>${li(n.why)}</ul>
+      ${n.tech.length ? `<h4>Termes techniques</h4><div class="chips">${n.tech.map((t) => `<span class="tech">${t}</span>`).join("")}</div>` : ""}
+      ${n.nums.length ? `<h4>Valeurs</h4><div class="chips">${n.nums.map((t) => `<span class="num">${t}</span>`).join("")}</div>` : ""}
+      <div class="acts"><button type="button" class="btn-primary" id="pipe-play">▶ Vidéo ${fmtT(n.t)}</button>${n.page !== "accueil" ? `<a class="btn" href="#${n.page}">Ouvrir le chapitre →</a>` : ""}</div>`;
+    $("#pipe-play").addEventListener("click", () => {
+      const v = $("#explainer-video"); v.currentTime = n.t; v.play().catch(() => {});
+      v.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+    });
+    drawEdges();
+  }
+  pipe.addEventListener("click", (e) => { const b = e.target.closest(".pnode"); if (b) { manualAt = performance.now(); show(b.dataset.node); } });
+  const step = (d) => { manualAt = performance.now(); const i = ORDER.indexOf(current); show(ORDER[(i + d + ORDER.length) % ORDER.length]); nodeEl(current).focus({ preventScroll: true }); };
+  $("#pipe-prev").addEventListener("click", () => step(-1));
+  $("#pipe-next").addEventListener("click", () => step(1));
+  // Follow the video: highlight the step being narrated.
+  const byTime = Object.entries(PIPE).sort((a, b) => a[1].t - b[1].t);
+  $("#explainer-video").addEventListener("timeupdate", (e) => {
+    const t = e.target.currentTime;
+    let now = null; for (const [k, n] of byTime) if (n.t <= t + 0.2) now = k;
+    pipe.querySelectorAll(".pnode").forEach((el) => el.classList.toggle("is-now", el.dataset.node === now && !e.target.paused));
+    if (now && now !== current && $("#pipe-follow").checked && !e.target.paused && performance.now() - manualAt > 6000) show(now);
+  });
+  $("#explainer-video").addEventListener("pause", () => pipe.querySelectorAll(".is-now").forEach((el) => el.classList.remove("is-now")));
+  new ResizeObserver(() => drawEdges()).observe(pipe);
+  redraws.accueil = () => drawEdges();
+  show(ORDER[0]);
+
+</script>
