@@ -1,8 +1,8 @@
-import { ColorCutQuantizer } from "/Users/theogoedert/Documents/Webworks/5-ludique-dev/1-creative-coding/paletcam/src/modules/color-cut-quantizer.js";
-import { selectPaletteCandidates } from "/Users/theogoedert/Documents/Webworks/5-ludique-dev/1-creative-coding/paletcam/src/modules/hybrid-selector.js";
-import { packImageDataToArgb8888, computePixelStride } from "/Users/theogoedert/Documents/Webworks/5-ludique-dev/1-creative-coding/paletcam/src/modules/palette-pixel-pack.js";
-import { rgbToOklab, oklabToRgb } from "/Users/theogoedert/Documents/Webworks/5-ludique-dev/1-creative-coding/paletcam/src/modules/color-space-oklch.js";
-import { findClosestRAL } from "/Users/theogoedert/Documents/Webworks/5-ludique-dev/1-creative-coding/paletcam/src/modules/color-matching-ral.js";
+import { ColorCutQuantizer } from "./src/modules/color-cut-quantizer.js";
+import { selectPaletteCandidates } from "./src/modules/hybrid-selector.js";
+import { packImageDataToArgb8888, computePixelStride } from "./src/modules/palette-pixel-pack.js";
+import { rgbToOklab, oklabToRgb } from "./src/modules/color-space-oklch.js";
+import { findClosestRAL } from "./src/modules/color-matching-ral.js";
 
 const toRgb = (argb) => ({ r: (argb >>> 16) & 0xff, g: (argb >>> 8) & 0xff, b: argb & 0xff });
 
